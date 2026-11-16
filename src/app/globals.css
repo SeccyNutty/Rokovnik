@@ -1,49 +1,565 @@
+/*
+  Rokovnik: stranica planera.
+  Plava tinta za događaje, crvena olovka za rokove, žuti marker za današnji dan,
+  tanke crte kao u rokovniku. Jedno pismo (Archivo) u dvije širine:
+  suženo za datume i naslove, normalno za tekst.
+*/
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --desk: #edf0f5;
+  --paper: #ffffff;
+  --rule: #d5dbe6;
+  --rule-soft: #e7ebf2;
+  --ink: #151d33;
+  --ink-2: #4a556e;
+  --ink-3: #6f7a92;
+  --pen: #2343d3;
+  --pen-dark: #1a33a8;
+  --pen-soft: #e8ecfd;
+  --red: #c9281a;
+  --red-soft: #fcebe8;
+  --marker: #ffe45c;
+  --ok: #1d7a4f;
+
+  --font: "Archivo Variable", Arial, Helvetica, sans-serif;
+  --radius: 10px;
+  --gutter: 20px;
+  --nav-h: 60px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+* { box-sizing: border-box; }
 
-html {
-  height: 100%;
-}
+html { -webkit-text-size-adjust: 100%; }
 
-html,
 body {
-  max-width: 100vw;
-  overflow-x: hidden;
-}
-
-body {
-  min-height: 100%;
-  display: flex;
-  flex-direction: column;
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-* {
-  box-sizing: border-box;
-  padding: 0;
   margin: 0;
+  background: var(--desk);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
-a {
-  color: inherit;
+a { color: var(--pen); text-underline-offset: 3px; }
+a:hover { color: var(--pen-dark); }
+
+h1, h2, h3 { margin: 0; line-height: 1.12; font-stretch: 78%; font-weight: 750; letter-spacing: -0.005em; }
+h1 { font-size: clamp(30px, 6vw, 44px); }
+h2 { font-size: 24px; }
+h3 { font-size: 19px; }
+p { margin: 0 0 12px; }
+
+:focus-visible { outline: 3px solid var(--pen); outline-offset: 2px; border-radius: 4px; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ── Zaglavlje i navigacija ─────────────────────────────────────────────── */
+
+.top {
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.top__in {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+  height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.brand {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 58px;
+  padding-left: 22px;
+  color: var(--ink);
   text-decoration: none;
+  font-stretch: 72%;
+  font-weight: 800;
+  font-size: 27px;
+  letter-spacing: 0.005em;
+}
+.brand:hover { color: var(--ink); }
+/* Crvena vrpca za označavanje stranice, kao u rokovniku. */
+.brand::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 12px;
+  height: 38px;
+  background: var(--red);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%);
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
+.nav { display: flex; gap: 4px; }
+.nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: var(--ink-2);
+  text-decoration: none;
+  font-weight: 550;
+  font-size: 15px;
+}
+.nav a:hover { background: var(--desk); color: var(--ink); }
+.nav a[aria-current="page"] { color: var(--pen); background: var(--pen-soft); }
+.nav svg { width: 20px; height: 20px; flex: none; }
+
+.page { max-width: 1080px; margin: 0 auto; padding: 28px var(--gutter) 72px; }
+
+.foot {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 var(--gutter) 40px;
+  color: var(--ink-3);
+  font-size: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+.foot a { color: var(--ink-2); }
+
+/* Na mobitelu navigacija je traka pri dnu, nadohvat palca. */
+@media (max-width: 719px) {
+  :root { --gutter: 16px; }
+  .top { position: static; }
+  .top__in { height: 52px; }
+  .brand { height: 52px; font-size: 25px; }
+  .brand::before { height: 34px; }
+  .nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    height: calc(var(--nav-h) + env(safe-area-inset-bottom));
+    padding: 0 6px env(safe-area-inset-bottom);
+    background: var(--paper);
+    border-top: 1px solid var(--rule);
+    gap: 0;
   }
+  .nav a {
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 2px;
+    font-size: 12.5px;
+    border-radius: 0;
+  }
+  .nav a[aria-current="page"] { background: none; }
+  .nav svg { width: 23px; height: 23px; }
+  .page { padding: 18px var(--gutter) calc(var(--nav-h) + 40px); }
+  .foot { padding-bottom: calc(var(--nav-h) + 28px); }
+}
+
+/* ── Raspored stranice ──────────────────────────────────────────────────── */
+
+.split { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; }
+.split > * { min-width: 0; }
+@media (min-width: 960px) {
+  .split { grid-template-columns: minmax(0, 1fr) 300px; gap: 40px; align-items: start; }
+  .split__aside { position: sticky; top: 82px; }
+}
+
+.lead { color: var(--ink-2); font-size: 18px; max-width: 34em; margin: 10px 0 0; }
+.muted { color: var(--ink-3); }
+.small { font-size: 14px; }
+
+.pagehead { margin-bottom: 22px; }
+.pagehead__row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 14px 20px; }
+.crumb { font-size: 14px; color: var(--ink-3); margin-bottom: 6px; }
+.crumb a { color: var(--ink-2); }
+
+.paper {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+.paper--pad { padding: 18px; }
+
+/* ── Gumbi i kontrole ───────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 10px 18px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: var(--pen);
+  color: #fff;
+  font: inherit;
+  font-weight: 650;
+  text-decoration: none;
+  cursor: pointer;
+}
+.btn:hover { background: var(--pen-dark); color: #fff; }
+.btn--quiet { background: var(--paper); color: var(--ink); border-color: var(--rule); }
+.btn--quiet:hover { background: var(--desk); color: var(--ink); }
+.btn--danger { background: var(--paper); color: var(--red); border-color: #efc4be; }
+.btn--danger:hover { background: var(--red-soft); color: var(--red); }
+.btn--small { min-height: 36px; padding: 6px 12px; font-size: 14px; }
+.btn--block { width: 100%; }
+.btn svg { width: 19px; height: 19px; flex: none; }
+
+.controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+.controls > .chips { min-width: 0; margin: 0; padding: 2px 0; }
+
+.seg { display: inline-flex; padding: 3px; background: #dfe4ee; border-radius: 9px; }
+.seg a {
+  padding: 6px 14px;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 7px;
+  color: var(--ink-2);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14.5px;
+}
+.seg a[aria-current="true"] { background: var(--paper); color: var(--ink); box-shadow: 0 1px 2px rgb(21 29 51 / 0.14); }
+
+.chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 calc(var(--gutter) * -1); padding: 2px var(--gutter); }
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 6px 13px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink-2);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14.5px;
+}
+.chip:hover { color: var(--ink); border-color: #b9c2d3; }
+.chip[aria-current="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+.chip__dot { width: 9px; height: 9px; border-radius: 50%; background: var(--pen); }
+.chip__dot--rok { background: var(--red); }
+
+/* ── Popis po danima (stranica planera) ─────────────────────────────────── */
+
+.agenda { background: var(--paper); border: 1px solid var(--rule); border-radius: var(--radius); overflow: hidden; margin-top: 14px; }
+
+.day { display: grid; grid-template-columns: 70px minmax(0, 1fr); border-top: 1px solid var(--rule); }
+.day:first-child { border-top: 0; }
+.day__date {
+  padding: 14px 0 12px 16px;
+  border-right: 1px solid var(--rule-soft);
+  line-height: 1;
+}
+.day__num {
+  display: inline-block;
+  font-stretch: 68%;
+  font-weight: 800;
+  font-size: 36px;
+  letter-spacing: -0.01em;
+  padding: 0 3px;
+  margin-left: -3px;
+}
+.day__wd { display: block; margin-top: 5px; font-size: 13.5px; font-weight: 600; color: var(--ink-2); }
+.day__mo { display: block; margin-top: 2px; font-size: 12.5px; color: var(--ink-3); }
+/* Današnji dan je prijeđen žutim markerom. */
+.day--today .day__num { background: linear-gradient(transparent 42%, var(--marker) 42%, var(--marker) 92%, transparent 92%); }
+.day--today .day__wd { color: var(--ink); }
+
+.day__list { list-style: none; margin: 0; padding: 4px 0; min-width: 0; }
+.day__list li + li { border-top: 1px dashed var(--rule-soft); }
+
+.entry {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: 0 8px;
+  width: 100%;
+  padding: 11px 14px 11px 12px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-height: 56px;
+}
+.entry:hover { background: #f5f7fb; }
+.entry:focus-visible { outline-offset: -3px; }
+.entry__time { font-variant-numeric: tabular-nums; font-weight: 650; font-size: 15px; color: var(--pen); padding-top: 1px; }
+.entry__time small { display: block; font-size: 12.5px; font-weight: 600; line-height: 1.25; padding-top: 2px; }
+.entry__title { display: block; font-weight: 650; font-size: 16.5px; line-height: 1.3; overflow-wrap: anywhere; }
+.entry__meta { display: block; margin-top: 2px; font-size: 14px; color: var(--ink-3); overflow-wrap: anywhere; }
+.entry__meta b { font-weight: 600; color: var(--ink-2); }
+
+/* Rok: crvena olovka. */
+.rok { color: var(--red); font-weight: 750; font-stretch: 80%; font-size: 15px; letter-spacing: 0.01em; }
+.entry--rok .entry__time { color: var(--red); }
+.entry--rok .entry__title { text-decoration: underline; text-decoration-color: var(--red); text-decoration-thickness: 2px; text-underline-offset: 4px; }
+
+.empty { padding: 34px 22px; text-align: center; color: var(--ink-2); }
+.empty h3 { margin-bottom: 8px; }
+.empty p { max-width: 30em; margin: 0 auto 14px; }
+
+/* ── Mjesečni prikaz ────────────────────────────────────────────────────── */
+
+.month { background: var(--paper); border: 1px solid var(--rule); border-radius: var(--radius); overflow: hidden; margin-top: 14px; }
+.month__bar { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--rule); }
+.month__title { font-stretch: 76%; font-weight: 750; font-size: 22px; }
+.month__title::first-letter { text-transform: uppercase; }
+.month__nav { display: flex; gap: 6px; }
+.month__nav a { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border: 1px solid var(--rule); border-radius: 8px; color: var(--ink); text-decoration: none; }
+.month__nav a:hover { background: var(--desk); }
+.month__nav svg { width: 18px; height: 18px; }
+.month__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.month__wd { padding: 7px 0; text-align: center; font-size: 12.5px; font-weight: 600; color: var(--ink-3); border-bottom: 1px solid var(--rule-soft); }
+.cell {
+  position: relative;
+  min-height: 92px;
+  padding: 6px 7px;
+  border-top: 1px solid var(--rule-soft);
+  border-left: 1px solid var(--rule-soft);
+  color: var(--ink);
+  text-decoration: none;
+  overflow: hidden;
+}
+.cell:nth-child(7n + 1) { border-left: 0; }
+.cell:hover { background: #f5f7fb; color: var(--ink); }
+.cell--out { color: #a6aec0; background: #fafbfd; }
+.cell__num { display: inline-block; font-stretch: 74%; font-weight: 750; font-size: 17px; line-height: 1.2; padding: 0 3px; }
+.cell--today .cell__num { background: linear-gradient(transparent 38%, var(--marker) 38%, var(--marker) 94%, transparent 94%); }
+.cell--selected { box-shadow: inset 0 0 0 2px var(--pen); border-radius: 4px; }
+.cell__items { list-style: none; margin: 3px 0 0; padding: 0; font-size: 12.5px; line-height: 1.25; }
+.cell__items li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 1px 0 1px 9px; position: relative; color: var(--ink-2); }
+.cell__items li::before { content: ""; position: absolute; left: 0; top: 6px; width: 5px; height: 5px; border-radius: 50%; background: var(--pen); }
+.cell__items li.is-rok { color: var(--red); font-weight: 600; }
+.cell__items li.is-rok::before { background: var(--red); }
+.cell__more { font-size: 12px; color: var(--ink-3); padding-left: 9px; }
+.cell__dots { display: none; gap: 3px; margin-top: 5px; padding-left: 3px; }
+.cell__dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--pen); }
+.cell__dots i.is-rok { background: var(--red); }
+@media (max-width: 719px) {
+  .cell { min-height: 52px; padding: 5px 3px; text-align: center; }
+  .cell__items, .cell__more { display: none; }
+  .cell__dots { display: flex; justify-content: center; padding-left: 0; }
+}
+.dayhead { margin: 22px 0 0; display: block; }
+.dayhead::first-letter { text-transform: uppercase; }
+
+/* ── Zajednice ──────────────────────────────────────────────────────────── */
+
+.aside__title { font-size: 15px; font-weight: 650; font-stretch: 100%; color: var(--ink-2); margin-bottom: 8px; letter-spacing: 0; }
+
+.clist { list-style: none; margin: 0; padding: 0; }
+.clist li + li { border-top: 1px solid var(--rule-soft); }
+.clist a { display: flex; align-items: center; gap: 12px; padding: 11px 14px; color: var(--ink); text-decoration: none; min-height: 56px; }
+.clist a:hover { background: #f5f7fb; }
+.clist__badge {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background: var(--pen-soft);
+  color: var(--pen);
+  display: grid;
+  place-items: center;
+  font-stretch: 70%;
+  font-weight: 800;
+  font-size: 15px;
+}
+.clist__name { font-weight: 650; display: block; line-height: 1.25; }
+.clist__count { font-size: 13.5px; color: var(--ink-3); display: block; }
+
+@media (max-width: 959px) {
+  .clist--row { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 calc(var(--gutter) * -1); padding: 2px var(--gutter); }
+  .clist--row::-webkit-scrollbar { display: none; }
+  .clist--row li { flex: none; border: 1px solid var(--rule) !important; border-radius: var(--radius); background: var(--paper); }
+  .clist--row a { padding: 8px 14px 8px 8px; min-height: 54px; }
+  .paper--bare-mobile { background: none; border: 0; border-radius: 0; }
+}
+
+.note { font-size: 14.5px; color: var(--ink-2); }
+.note p:last-child { margin-bottom: 0; }
+
+/* ── Opis događaja (prozor na računalu, ploča odozdo na mobitelu) ───────── */
+
+.sheet {
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(86dvh, 760px);
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 24px 70px rgb(21 29 51 / 0.32);
+  overflow: hidden;
+}
+.sheet::backdrop { background: rgb(21 29 51 / 0.46); }
+.sheet[open] { display: flex; flex-direction: column; animation: sheet-in 0.18s ease-out; }
+.sheet__scroll { overflow-y: auto; padding: 22px 22px 8px; overscroll-behavior: contain; }
+.sheet__foot { padding: 14px 22px calc(18px + env(safe-area-inset-bottom)); border-top: 1px solid var(--rule); background: var(--paper); }
+.sheet__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--desk);
+  color: var(--ink);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.sheet__close:hover { background: #dfe4ee; }
+.sheet__close svg { width: 18px; height: 18px; }
+@keyframes sheet-in { from { opacity: 0; transform: translateY(10px); } }
+
+@media (max-width: 719px) {
+  .sheet {
+    width: 100vw;
+    max-width: 100vw;
+    max-height: 90dvh;
+    margin: auto 0 0;
+    border-radius: 18px 18px 0 0;
+  }
+  .sheet[open] { animation: sheet-up 0.22s ease-out; }
+  .sheet__scroll { padding: 20px 18px 8px; }
+  .sheet__foot { padding: 12px 18px calc(16px + env(safe-area-inset-bottom)); }
+  @keyframes sheet-up { from { transform: translateY(40%); opacity: 0.6; } }
+}
+@media (prefers-reduced-motion: reduce) { .sheet[open] { animation: none; } }
+
+.detail__kind { display: flex; align-items: center; gap: 10px; font-size: 14.5px; color: var(--ink-2); margin-bottom: 8px; padding-right: 44px; }
+.detail__title { font-size: 26px; padding-right: 30px; overflow-wrap: anywhere; }
+.detail--rok .detail__title { text-decoration: underline; text-decoration-color: var(--red); text-decoration-thickness: 3px; text-underline-offset: 5px; }
+.facts { margin: 16px 0 0; padding: 0; display: grid; gap: 0; border-top: 1px solid var(--rule-soft); }
+.facts div { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--rule-soft); }
+.facts dt { color: var(--ink-3); font-size: 14.5px; }
+.facts dd { margin: 0; font-weight: 550; overflow-wrap: anywhere; }
+.facts dd::first-letter { text-transform: uppercase; }
+.detail__text { margin-top: 16px; white-space: pre-line; overflow-wrap: anywhere; max-width: 62ch; }
+.detail__unsure { margin-top: 14px; padding: 10px 12px; background: #fff8d6; border-radius: 8px; font-size: 14.5px; }
+.detail__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+
+.addcal__options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.addcal__options a { min-height: 48px; font-size: 15px; padding: 8px 10px; text-align: center; line-height: 1.2; }
+.addcal__row { display: flex; gap: 8px; }
+.addcal__row .btn:first-child { flex: 1; }
+.addcal__hint { margin: 10px 0 0; font-size: 13.5px; color: var(--ink-3); }
+
+.linkrow { display: flex; gap: 8px; margin-top: 12px; }
+.linkrow input {
+  flex: 1;
+  min-width: 0;
+  height: 46px;
+  padding: 0 12px;
+  border: 1px solid var(--rule);
+  border-radius: 9px;
+  background: var(--desk);
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+/* ── Obrasci ────────────────────────────────────────────────────────────── */
+
+.field { display: grid; gap: 5px; margin-bottom: 14px; }
+.field label { font-weight: 600; font-size: 14.5px; }
+.field input, .field select, .field textarea {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid #b9c2d3;
+  border-radius: 9px;
+  background: var(--paper);
+  font: inherit;
+  color: var(--ink);
+}
+.field textarea { min-height: 150px; resize: vertical; }
+.field small { color: var(--ink-3); font-size: 13.5px; }
+
+.check { display: flex; align-items: center; gap: 12px; padding: 12px 14px; min-height: 56px; cursor: pointer; }
+.check + .check { border-top: 1px solid var(--rule-soft); }
+.check input { width: 22px; height: 22px; accent-color: var(--pen); flex: none; }
+.check:hover { background: #f5f7fb; }
+
+.flash { padding: 12px 14px; border-radius: 9px; margin-bottom: 16px; font-weight: 550; }
+.flash--ok { background: #e4f4ec; color: #135a3a; }
+.flash--err { background: var(--red-soft); color: #8f1c12; }
+
+/* ── Koraci (stranica "Objavi") ─────────────────────────────────────────── */
+
+.steps { list-style: none; counter-reset: s; margin: 0; padding: 0; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 54px minmax(0, 1fr); padding: 16px 18px 16px 0; border-top: 1px solid var(--rule); }
+.steps li:first-child { border-top: 0; }
+.steps li::before { content: counter(s); font-stretch: 68%; font-weight: 800; font-size: 34px; line-height: 1; text-align: center; color: var(--pen); }
+.steps h3 { margin-bottom: 4px; }
+.steps p { margin: 0; color: var(--ink-2); }
+.address { display: inline-block; margin-top: 8px; padding: 8px 12px; background: var(--pen-soft); border-radius: 8px; font-weight: 650; overflow-wrap: anywhere; color: var(--ink); }
+
+.prose { max-width: 62ch; }
+.prose h2 { margin: 26px 0 8px; }
+.prose ul { padding-left: 20px; }
+
+/* ── Administracija ─────────────────────────────────────────────────────── */
+
+.admin h2 { margin: 30px 0 10px; }
+.admin__grid { display: grid; gap: 12px; }
+.reqcard { padding: 16px; }
+.reqcard__from { font-weight: 650; overflow-wrap: anywhere; }
+.reqcard__form { display: grid; gap: 10px; margin-top: 12px; }
+@media (min-width: 720px) { .reqcard__form { grid-template-columns: 1fr 1fr; } .reqcard__form .span2 { grid-column: span 2; } }
+.reqcard__form .field { margin: 0; }
+.reqcard__btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+.table th { text-align: left; font-weight: 600; color: var(--ink-3); font-size: 13.5px; padding: 8px 12px; border-bottom: 1px solid var(--rule); }
+.table td { padding: 9px 12px; border-bottom: 1px solid var(--rule-soft); vertical-align: top; overflow-wrap: anywhere; }
+.table tr:last-child td { border-bottom: 0; }
+.tablewrap { overflow-x: auto; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 13px; font-weight: 600; background: var(--desk); color: var(--ink-2); white-space: nowrap; }
+.tag--ok { background: #e4f4ec; color: #135a3a; }
+.tag--wait { background: #fff3c4; color: #6b5200; }
+.tag--bad { background: var(--red-soft); color: #8f1c12; }
+.inline { display: inline; }
+
+/* ── Ugrađeni kalendar ──────────────────────────────────────────────────── */
+
+.embed { background: var(--paper); min-height: 100vh; }
+.embed .agenda { border: 0; border-radius: 0; margin: 0; }
+.embed__foot { padding: 10px 14px; font-size: 13.5px; border-top: 1px solid var(--rule); display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.embed .entry { cursor: pointer; text-decoration: none; }
+
+pre.code { margin: 8px 0 0; padding: 12px; background: var(--ink); color: #e7ebf7; border-radius: 9px; font-size: 13px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
+details.more { margin-top: 14px; font-size: 14.5px; }
+details.more summary { cursor: pointer; font-weight: 600; color: var(--ink-2); padding: 6px 0; }
+
+.linklike { border: 0; background: none; padding: 0; font: inherit; color: var(--pen); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+
+.only-mobile { display: none; }
+@media (max-width: 959px) {
+  .only-mobile { display: block; }
+  .only-desktop { display: none; }
+}
+.embed a.entry { text-decoration: none; }
+
+@media (max-width: 719px) {
+  .day { grid-template-columns: 60px minmax(0, 1fr); }
+  .day__date { padding-left: 12px; }
+  .day__num { font-size: 32px; }
+  .entry { grid-template-columns: 52px minmax(0, 1fr); padding-left: 10px; padding-right: 12px; }
 }

@@ -1,0 +1,7 @@
+# Netlify sam prepoznaje Next.js. Prije builda primjenjuju se migracije baze.
+[build]
+  command = "pnpm db:migrate && pnpm build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
