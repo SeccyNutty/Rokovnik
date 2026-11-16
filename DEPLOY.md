@@ -4,10 +4,66 @@
 
 ## 1. Baza: Supabase
 
-1. Otvori novi projekt na supabase.com (regija: Frankfurt).
-2. **Connect → Transaction pooler** (port 6543): kopiraj connection string i upiši lozinku baze. To je `DATABASE_URL`.
+Ovdje se čuvaju zajednice, objave, primljeni mailovi i zahtjevi. Aplikacija se na bazu spaja isključivo s poslužitelja, običnim Postgres spojem; Supabase API, `anon` ključ i `service_role` ključ ne koriste se i ne treba ih nigdje upisivati.
 
-Tablice nastaju same pri prvom buildu (`pnpm db:migrate` je dio build naredbe). Aplikacija se na bazu spaja samo s poslužitelja; Supabase API i ključevi se ne koriste.
+### 1.1 Napravi projekt
+
+1. Otvori [supabase.com](https://supabase.com) → **Start your project** i prijavi se (može GitHub računom).
+2. **New project**, pa ispuni:
+   - **Name**: `rokovnik`
+   - **Database Password**: klikni **Generate a password** i **odmah ga spremi** (npr. u upravitelj lozinki). Prikazuje se samo jednom. Ako ga izgubiš, postavi novi u *Project Settings → Database → Database password → Reset*.
+   - **Region**: **Central EU (Frankfurt)** — najbliže Hrvatskoj, pa je baza brža.
+   - **Plan**: Free.
+3. **Create new project**. Priprema traje oko minutu.
+
+### 1.2 Kopiraj connection string
+
+1. U projektu klikni **Connect** (gumb pri vrhu stranice).
+2. Odaberi **Transaction pooler**. Dobiješ niz oblika:
+
+   ```
+   postgresql://postgres.abcdefghijklmnop:[YOUR-PASSWORD]@aws-1-eu-central-1.pooler.supabase.com:6543/postgres
+   ```
+
+3. `[YOUR-PASSWORD]` (zajedno s uglatim zagradama) zamijeni lozinkom iz koraka 1.1. To je `DATABASE_URL`.
+
+**Zašto baš Transaction pooler, a ne Direct connection:** izravni spoj (`db.<ref>.supabase.co:5432`) na besplatnom planu radi samo preko IPv6, a Netlify i slični poslužitelji spajaju se preko IPv4; spoj bi pucao s „network is unreachable". Pooler je dostupan preko IPv4 na svim planovima. Uz to, aplikacija pri svakom zahtjevu otvara kratkotrajne spojeve, a upravo za to pooler služi (aplikacija zato koristi `prepare: false`, što transakcijski način traži).
+
+**Ako lozinka sadrži posebne znakove** (`@ : / ? # [ ] %` i slično), u nizu ih treba zamijeniti kodom: `@` → `%40`, `:` → `%3A`, `/` → `%2F`, `#` → `%23`, `%` → `%25`. Jednostavnije je generiranu lozinku ostaviti kakva jest ili postaviti novu bez tih znakova.
+
+### 1.3 Isprobaj spoj sa svog računala
+
+U mapi projekta napravi datoteku `.env.local` s jednim retkom (niz obavezno u navodnicima):
+
+```bash
+DATABASE_URL="postgresql://postgres.abcdefghijklmnop:lozinka@aws-1-eu-central-1.pooler.supabase.com:6543/postgres"
+```
+
+pa pokreni:
+
+```bash
+pnpm db:migrate
+```
+
+Ispis **„Migracije su primijenjene."** znači da spoj radi i da su tablice napravljene. Provjeri ih u Supabaseu pod **Table Editor**: trebaju postojati `communities`, `items`, `messages`, `community_requests` i `sender_rules`.
+
+Ako želiš lokalno raditi s ugrađenom bazom umjesto sa Supabaseom, samo obriši ili zakomentiraj redak `DATABASE_URL`.
+
+### 1.4 Česte greške
+
+| Poruka | Uzrok i rješenje |
+|---|---|
+| `password authentication failed` | Kriva lozinka ili neizmijenjen `[YOUR-PASSWORD]`. Ako je lozinka s posebnim znakovima, kodiraj ih (1.2) ili postavi novu. |
+| `network is unreachable` / `ENETUNREACH` | Koristiš izravni spoj na IPv6. Uzmi **Transaction pooler** (port 6543). |
+| `Tenant or user not found` | Korisničko ime mora biti `postgres.<oznaka-projekta>`, a ne samo `postgres`. Kopiraj niz ponovno iz **Connect**. |
+| `prepared statement ... already exists` | Nedostaje `prepare: false`. Aplikacija ga postavlja sama; javlja se ako spajaš nekim drugim alatom. |
+| Spoj radi, a onda prestane | Besplatni projekt pauzira se nakon 7 dana bez ijednog upita na bazu. U Supabaseu klikni **Resume project**; podaci ostaju. Za pilot bez prometa postavi npr. GitHub Action koji jednom dnevno otvori `/api/health`. |
+
+### 1.5 Što dalje
+
+Isti `DATABASE_URL` upisuješ i na Netlify (korak 4). Tablice se ondje rade same, jer je `pnpm db:migrate` dio build naredbe u `netlify.toml`.
+
+**Besplatni plan:** 500 MB baze i bez automatskih sigurnosnih kopija. Za Rokovnik je 500 MB i više nego dovoljno (tekst objava), ali kopije napravi sam prije širenja: *Database → Backups* nudi preuzimanje, ili lokalno `pg_dump "$DATABASE_URL" > kopija.sql`.
 
 ## 2. AI za čitanje mailova: Anthropic
 
