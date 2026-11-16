@@ -65,11 +65,15 @@ Isti `DATABASE_URL` upisuješ i na Netlify (korak 4). Tablice se ondje rade same
 
 **Besplatni plan:** 500 MB baze i bez automatskih sigurnosnih kopija. Za Rokovnik je 500 MB i više nego dovoljno (tekst objava), ali kopije napravi sam prije širenja: *Database → Backups* nudi preuzimanje, ili lokalno `pg_dump "$DATABASE_URL" > kopija.sql`.
 
-## 2. AI za čitanje mailova: Anthropic
+## 2. AI za čitanje mailova: Anthropic ili Gemini
 
 Na console.anthropic.com napravi API ključ: `ANTHROPIC_API_KEY`. Jedna okružnica stoji djelić centa. Bez ključa aplikacija radi, ali mailove čita jednostavnim pravilima, što za stvarne okružnice nije dovoljno pouzdano.
 
 Zadani model je `claude-haiku-5-5` (`LLM_MODEL`). Ako želiš drugi, provjeri točan naziv u Anthropicovoj dokumentaciji.
+
+**Alternativa: Gemini.** Ključ napraviš u Google AI Studiju (aistudio.google.com → Get API key) i upišeš kao `GEMINI_API_KEY`. Besplatni sloj ne traži karticu, ali ima ograničenje brzine i Google u njemu smije koristiti poslani sadržaj za poboljšanje svojih proizvoda, pa ga nemoj koristiti za tuđe okružnice (npr. FSB) bez dopuštenja. Plaćeni sloj to ne radi. Zadani model je `gemini-3.6-flash` (`GEMINI_MODEL`); ako Google javi da model ne postoji, u AI Studiju pogledaj trenutni naziv.
+
+Ako su postavljena oba ključa, `LLM_PROVIDER=gemini` ili `LLM_PROVIDER=anthropic` odlučuje koji se koristi. Na stranici /admin piše koji je aktivan.
 
 ## 3. Mail: Resend
 

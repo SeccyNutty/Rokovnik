@@ -3,7 +3,7 @@ import Link from "next/link";
 import { RequestForm } from "@/components/RequestForm";
 import { requireAdmin } from "@/lib/auth";
 import { adminEmail, forwarderEmails, inboundAddress } from "@/lib/config";
-import { extractorMode } from "@/lib/extract";
+import { extractorMode, llmProvider, PROVIDER_LABEL } from "@/lib/extract";
 import { listCommunities, listRecentItems, listRecentMessages, listRequests, listRules, relatedCommunities } from "@/lib/queries";
 import { canSendEmail } from "@/lib/resend";
 import { dateKey, formatDateShort, timeKey } from "@/lib/time";
@@ -71,7 +71,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       <div className="paper paper--pad note">
         <p>
           <b>Adresa za objave:</b> {address ?? "nije postavljena (INBOUND_ADDRESS)"} · <b>Čitanje mailova:</b>{" "}
-          {mode === "ai" ? "AI (Claude)" : "jednostavna pravila, bez AI-ja (ANTHROPIC_API_KEY nije postavljen)"} · <b>Obavijesti o zahtjevima:</b>{" "}
+          {mode === "ai" ? `AI (${PROVIDER_LABEL[llmProvider()!]})` : "jednostavna pravila, bez AI-ja (ANTHROPIC_API_KEY ili GEMINI_API_KEY nije postavljen)"} · <b>Obavijesti o zahtjevima:</b>{" "}
           {canSendEmail() && adminEmail() ? `mailom na ${adminEmail()}` : "samo ovdje, u administraciji (za obavijest mailom postavi RESEND_API_KEY i ADMIN_EMAIL)"}
         </p>
         <p>

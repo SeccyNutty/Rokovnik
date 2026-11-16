@@ -2,7 +2,7 @@ import { and, eq, or, sql } from "drizzle-orm";
 import { getDb, type Db } from "@/db";
 import { communities, communityRequests, items, messages, senderRules, type Community, type CommunityRequest, type Message, type NewItem } from "@/db/schema";
 import { adminEmail, APP_NAME, configuredBaseUrl, forwarderEmails } from "./config";
-import { extractItems, type ExtractedItem, type Extractor } from "./extract";
+import { extractItems, llmProvider, type ExtractedItem, type Extractor } from "./extract";
 import { canSendEmail, loadReceivedAttachments, sendEmail } from "./resend";
 import { cleanSubject, findForwardedOriginal, parseMailbox, requestKeyFor, slugify, suggestCommunityName } from "./sender";
 import { addDays, dateKey, isValidDateKey, isValidTimeKey, zonedToUtc } from "./time";
@@ -169,7 +169,7 @@ async function defaultNotifyAdmin(request: CommunityRequest, baseUrl: string | n
 }
 
 async function defaultLoadAttachments(message: Message): Promise<Attachment[]> {
-  if (message.provider !== "resend" || !process.env.RESEND_API_KEY || !process.env.ANTHROPIC_API_KEY) return [];
+  if (message.provider !== "resend" || !process.env.RESEND_API_KEY || !llmProvider()) return [];
   return loadReceivedAttachments(message.providerId);
 }
 
