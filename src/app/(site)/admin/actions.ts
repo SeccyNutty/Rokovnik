@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { getDb } from "@/db";
 import { communities, items } from "@/db/schema";
 import { isAdmin, requireAdmin } from "@/lib/auth";
@@ -61,12 +62,22 @@ export async function decideRequestAction(form: FormData): Promise<void> {
   }
   const result = await approveRequest(
     requestId,
-    { name: str(form, "name"), slug: str(form, "slug"), existingCommunityId: str(form, "existing") || null },
+    {
+      name: str(form, "name"),
+      slug: str(form, "slug"),
+      existingCommunityId: str(form, "existing") || null,
+      // AI čitanje mailova na čekanju traje nekoliko sekundi: radi se nakon odgovora, da potvrda bude trenutna.
+      defer: (work) =>
+        after(async () => {
+          await work();
+          revalidatePath("/", "layout");
+        }),
+    },
     { baseUrl: await baseUrl() },
   );
   revalidatePath("/", "layout");
   if (!result) redirect(`${back}?poruka=vec-rijeseno`);
-  redirect(`${back}?poruka=potvrdeno&z=${result.community.slug}&n=${result.published}`);
+  redirect(`${back}?poruka=potvrdeno&z=${result.community.slug}&n=${result.published}&c=${result.deferred}`);
 }
 
 export async function reprocessAction(form: FormData): Promise<void> {

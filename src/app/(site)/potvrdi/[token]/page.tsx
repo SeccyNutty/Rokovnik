@@ -9,7 +9,7 @@ import { verifyRequestToken } from "@/lib/tokens";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Potvrda zajednice", robots: { index: false } };
 
-type Props = { params: Promise<{ token: string }>; searchParams: Promise<{ poruka?: string; z?: string; n?: string }> };
+type Props = { params: Promise<{ token: string }>; searchParams: Promise<{ poruka?: string; z?: string; n?: string; c?: string }> };
 
 /** Stranica iz poveznice u mailu administratoru: potvrda nove zajednice jednim klikom, bez prijave. */
 export default async function ConfirmPage({ params, searchParams }: Props) {
@@ -37,7 +37,8 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
         {approved ? (
           <>
             <p>
-              {sp.n && Number(sp.n) > 0 ? `Objavljeno stavki: ${sp.n}. ` : ""}Budući mailovi s {request.value} objavljuju se automatski.
+              {sp.n && Number(sp.n) > 0 ? `Objavljeno stavki: ${sp.n}. ` : ""}
+              {sp.c && Number(sp.c) > 0 ? "Mailovi na čekanju upravo se obrađuju i pojavit će se u zajednici za nekoliko sekundi. " : ""}Budući mailovi s {request.value} objavljuju se automatski.
             </p>
             {sp.z ? (
               <Link className="btn" href={`/z/${sp.z}`}>

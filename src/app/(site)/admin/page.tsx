@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AutoRefresh } from "@/components/AutoRefresh";
 import { RequestForm } from "@/components/RequestForm";
+import { SubmitButton } from "@/components/SubmitButton";
 import { requireAdmin } from "@/lib/auth";
 import { adminEmail, forwarderEmails, inboundAddress } from "@/lib/config";
 import { extractorMode, llmProvider, PROVIDER_LABEL } from "@/lib/extract";
@@ -23,7 +25,7 @@ const STATUS: Record<string, { label: string; cls: string }> = {
 };
 
 const FLASH: Record<string, { text: string; ok: boolean }> = {
-  potvrdeno: { text: "Zajednica je potvrđena, a mailovi na čekanju su obrađeni.", ok: true },
+  potvrdeno: { text: "Zajednica je potvrđena. Mailovi na čekanju obrađuju se u pozadini i pojavit će se ovdje sami.", ok: true },
   odbijeno: { text: "Pošiljatelj je odbijen.", ok: true },
   "vec-rijeseno": { text: "Taj je zahtjev već riješen.", ok: true },
   obradeno: { text: "Poruka je ponovno obrađena.", ok: true },
@@ -55,6 +57,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   return (
     <div className="admin">
+      <AutoRefresh active={messages.some((m) => m.status === "processing")} />
       <div className="pagehead">
         <div className="pagehead__row">
           <h1>Administracija</h1>
@@ -106,9 +109,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <label htmlFor="t-text">Tekst maila</label>
           <textarea id="t-text" name="text" required placeholder="Predavanje će se održati 15. 12. 2026. u 14:15 u dvorani A. Prijave do 10. 12. na https://…" />
         </div>
-        <button className="btn" type="submit">
-          Pošalji testni mail
-        </button>
+        <SubmitButton pending="Obrađujem mail…">Pošalji testni mail</SubmitButton>
       </form>
 
       <h2 id="zajednice">Zajednice ({communities.length})</h2>
@@ -187,9 +188,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   {["failed", "no_items", "published", "processing"].includes(m.status) ? (
                     <form action={reprocessAction} className="inline">
                       <input type="hidden" name="messageId" value={m.id} />
-                      <button className="btn btn--quiet btn--small" type="submit">
+                      <SubmitButton className="btn btn--quiet btn--small" pending="Obrađujem…">
                         Obradi ponovno
-                      </button>
+                      </SubmitButton>
                     </form>
                   ) : null}
                 </td>

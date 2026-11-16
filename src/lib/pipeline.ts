@@ -363,7 +363,16 @@ export async function createCommunity(input: { name: string; slug?: string; desc
   return row;
 }
 
-export type ApproveInput = { name?: string; slug?: string; existingCommunityId?: string | null };
+export type ApproveInput = {
+  name?: string;
+  slug?: string;
+  existingCommunityId?: string | null;
+  /**
+   * Ako je zadano, mailovi na čekanju obrađuju se naknadno (npr. nakon što je odgovor poslan),
+   * pa potvrda ne čeka AI čitanje. Bez toga se obrađuju odmah.
+   */
+  defer?: (work: () => Promise<void>) => void;
+};
 
 /**
  * Potvrda zahtjeva: nastaje zajednica (ili se pošiljatelj veže uz postojeću),
@@ -373,7 +382,7 @@ export async function approveRequest(
   requestId: string,
   input: ApproveInput = {},
   deps: PipelineDeps = {},
-): Promise<{ community: Community; published: number; processed: ProcessResult[] } | null> {
+): Promise<{ community: Community; published: number; processed: ProcessResult[]; deferred: number } | null> {
   const db = await getDb();
   const [request] = await db.select().from(communityRequests).where(eq(communityRequests.id, requestId));
   if (!request || request.status !== "pending") return null;
@@ -393,9 +402,22 @@ export async function approveRequest(
     .where(and(eq(messages.requestId, requestId), eq(messages.status, "pending_community")))
     .returning({ id: messages.id });
 
+  if (input.defer && waiting.length) {
+    input.defer(async () => {
+      for (const m of waiting) {
+        try {
+          await processMessage(m.id, deps);
+        } catch (e) {
+          console.error("Naknadna obrada poruke nije uspjela", m.id, e);
+        }
+      }
+    });
+    return { community, published: 0, processed: [], deferred: waiting.length };
+  }
+
   const processed: ProcessResult[] = [];
   for (const m of waiting) processed.push(await processMessage(m.id, deps));
-  return { community, published: processed.reduce((n, p) => n + p.itemIds.length, 0), processed };
+  return { community, published: processed.reduce((n, p) => n + p.itemIds.length, 0), processed, deferred: 0 };
 }
 
 /** Odbijanje: pošiljatelj ostaje zapisan kao odbijen, pa se budući mailovi ne obrađuju. */

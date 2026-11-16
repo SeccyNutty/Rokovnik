@@ -213,6 +213,7 @@ p { margin: 0 0 12px; }
 .btn--danger:hover { background: var(--red-soft); color: var(--red); }
 .btn--small { min-height: 36px; padding: 6px 12px; font-size: 14px; }
 .btn--block { width: 100%; }
+.btn:disabled { opacity: 0.6; cursor: progress; }
 .btn svg { width: 19px; height: 19px; flex: none; }
 
 .controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }

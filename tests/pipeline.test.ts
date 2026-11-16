@@ -240,3 +240,20 @@ describe("Moj kalendar: pojedinačno spremljene stavke", () => {
     expect(parseSaved(many.join("."))).toHaveLength(SAVED_MAX);
   });
 });
+
+describe("potvrda s naknadnom obradom", () => {
+  it("odmah vraća potvrdu, a mailove na čekanju obrađuje odgođeni posao", async () => {
+    const first = await ingestEmail(mail(), deps());
+    let work: (() => Promise<void>) | undefined;
+    const result = await approveRequest(first.requestId!, { defer: (w) => void (work = w) }, deps());
+    expect(result).toMatchObject({ published: 0, deferred: 1 });
+    expect(await db.select().from(items)).toHaveLength(0);
+    const [waiting] = await db.select().from(messages);
+    expect(waiting.status).toBe("processing");
+
+    await work!();
+    expect(await db.select().from(items)).toHaveLength(2);
+    const [done] = await db.select().from(messages);
+    expect(done.status).toBe("published");
+  });
+});

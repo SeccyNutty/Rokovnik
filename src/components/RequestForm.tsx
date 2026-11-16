@@ -1,5 +1,6 @@
 import type { Community, CommunityRequest } from "@/db/schema";
 import { decideRequestAction } from "@/app/(site)/admin/actions";
+import { SubmitButton } from "./SubmitButton";
 
 /** Zahtjev za novu zajednicu: ime je predloženo, dovoljno je kliknuti "Potvrdi". */
 export function RequestForm(props: {
@@ -47,16 +48,16 @@ export function RequestForm(props: {
           </div>
         ) : null}
         <div className="reqcard__btns span2">
-          <button className="btn" type="submit" name="odluka" value="potvrdi">
+          <SubmitButton name="odluka" value="potvrdi" pending="Potvrđujem…">
             Potvrdi zajednicu
-          </button>
-          <button className="btn btn--danger" type="submit" name="odluka" value="odbij">
+          </SubmitButton>
+          <SubmitButton className="btn btn--danger" name="odluka" value="odbij" pending="Odbijam…">
             Odbij pošiljatelja
-          </button>
+          </SubmitButton>
         </div>
       </form>
       <p className="small muted" style={{ margin: "10px 0 0" }}>
-        Potvrdom se mailovi na čekanju odmah obrađuju i objavljuju, a budući mailovi s {r.kind === "domain" ? "ove domene" : "ove adrese"} idu bez potvrde.
+        Potvrdom se mailovi na čekanju obrađuju i objavljuju (za nekoliko sekundi), a budući mailovi s {r.kind === "domain" ? "ove domene" : "ove adrese"} idu bez potvrde.
       </p>
     </div>
   );
