@@ -20,8 +20,19 @@ async function create(): Promise<Db> {
   if (url) {
     const { default: postgres } = await import("postgres");
     const { drizzle } = await import("drizzle-orm/postgres-js");
-    // prepare:false i mali pool: radi i preko Supabase transakcijskog poolera na serverlessu.
-    const client = postgres(url, { prepare: false, max: Number(process.env.DATABASE_POOL ?? 3) });
+    // Postavke za Supabase transakcijski pooler (port 6543) na serverlessu:
+    //  - prepare:false: pooler dijeli veze, pa pripremljeni upiti ne vrijede;
+    //  - max_pipeline:1: pooler zna zapeti kad više upita stigne istom vezom prije odgovora
+    //    (usporedni upiti tada čekaju red ili idu drugom vezom);
+    //  - query_timeout: ako baza ipak zašuti, upit pada s jasnom greškom umjesto da stranica visi.
+    const client = postgres(url, {
+      prepare: false,
+      max: Number(process.env.DATABASE_POOL ?? 3),
+      max_pipeline: 1,
+      query_timeout: 12,
+      connect_timeout: 10,
+      idle_timeout: 20,
+    });
     return drizzle(client, { schema }) as unknown as Db;
   }
   if (process.env.NETLIFY || process.env.VERCEL) {

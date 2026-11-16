@@ -10,7 +10,7 @@ async function main() {
     console.log("DATABASE_URL nije postavljen: lokalna baza (PGlite) migrira se sama pri pokretanju.");
     return;
   }
-  const client = postgres(url, { max: 1, prepare: false });
+  const client = postgres(url, { max: 1, prepare: false, max_pipeline: 1, connect_timeout: 15 });
   await migrate(drizzle(client), { migrationsFolder: path.join(process.cwd(), "drizzle") });
   await client.end();
   console.log("Migracije su primijenjene.");
