@@ -7,6 +7,12 @@ import type { IcsItem } from "./ics";
 import { candidateDomains } from "./sender";
 import { dateKey, formatWhen, startOfToday, timeKey } from "./time";
 
+/**
+ * Datum kao parametar u ručno pisanom SQL-u. Pogon postgres-js ne prima Date izvan stupca
+ * (PGlite prima), pa ga šaljemo kao ISO tekst s izričitim tipom.
+ */
+const ts = (d: Date) => sql`${d.toISOString()}::timestamptz`;
+
 export type ItemRow = Item & { communityName: string; communitySlug: string };
 
 /** Stavka pripremljena za prikaz: svi tekstovi termina izračunati su na poslužitelju. */
@@ -128,7 +134,7 @@ export async function listItems(f: ItemFilter = {}): Promise<ItemRow[]> {
     f.includeHidden ? undefined : eq(items.status, "published"),
     f.communityIds ? inArray(items.communityId, f.communityIds) : undefined,
     f.kind ? eq(items.kind, f.kind) : undefined,
-    f.from ? gte(sql`coalesce(${items.endsAt}, ${items.startsAt})`, f.from) : undefined,
+    f.from ? gte(sql`coalesce(${items.endsAt}, ${items.startsAt})`, ts(f.from)) : undefined,
     f.to ? lt(items.startsAt, f.to) : undefined,
   ].filter(Boolean);
   return db
@@ -163,7 +169,7 @@ export async function listCommunities(now = new Date()): Promise<CommunityWithCo
   const counts = await db
     .select({ communityId: items.communityId, n: count() })
     .from(items)
-    .where(and(eq(items.status, "published"), gte(sql`coalesce(${items.endsAt}, ${items.startsAt})`, startOfToday(now))))
+    .where(and(eq(items.status, "published"), gte(sql`coalesce(${items.endsAt}, ${items.startsAt})`, ts(startOfToday(now)))))
     .groupBy(items.communityId);
   const byId = new Map(counts.map((c) => [c.communityId, Number(c.n)]));
   return all.map((c) => ({ ...c, upcoming: byId.get(c.id) ?? 0 }));
