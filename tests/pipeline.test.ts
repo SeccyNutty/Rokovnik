@@ -212,3 +212,31 @@ describe("izvlačenje prema pravilima (bez AI-ja)", () => {
     expect(r.items).toHaveLength(0);
   });
 });
+
+describe("Moj kalendar: pojedinačno spremljene stavke", () => {
+  it("vraća spremljenu stavku i bez odabrane zajednice, a s njom i uz druge zajednice", async () => {
+    const first = await ingestEmail(mail(), deps());
+    await approveRequest(first.requestId!, {}, deps());
+    const all = await db.select().from(items);
+    const event = all.find((i) => i.kind === "event")!;
+    const { listItems } = await import("@/lib/queries");
+
+    expect(await listItems({ communityIds: [] })).toHaveLength(0);
+    const onlySaved = await listItems({ communityIds: [], itemIds: [event.id] });
+    expect(onlySaved.map((r) => r.id)).toEqual([event.id]);
+
+    const withCommunity = await listItems({ communityIds: [event.communityId], itemIds: [event.id] });
+    expect(withCommunity).toHaveLength(all.length);
+  });
+
+  it("popis iz kolačića prihvaća samo ispravne oznake, bez ponavljanja", async () => {
+    const { parseSaved, serializeSaved, SAVED_MAX } = await import("@/lib/saved");
+    const a = "11111111-1111-4111-8111-111111111111";
+    const b = "22222222-2222-4222-8222-222222222222";
+    expect(parseSaved(`${a}.${b}.${a}.nesto'; drop table--`)).toEqual([a, b]);
+    expect(parseSaved(undefined)).toEqual([]);
+    expect(parseSaved(serializeSaved([a, b]))).toEqual([a, b]);
+    const many = Array.from({ length: SAVED_MAX + 5 }, (_, i) => `${String(i).padStart(8, "0")}-1111-4111-8111-111111111111`);
+    expect(parseSaved(many.join("."))).toHaveLength(SAVED_MAX);
+  });
+});

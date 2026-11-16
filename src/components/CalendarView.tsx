@@ -29,6 +29,8 @@ export async function CalendarView(props: {
   basePath: string;
   params: SearchParams;
   communityIds?: string[];
+  /** Pojedinačno spremljene stavke, uz stavke odabranih zajednica. */
+  itemIds?: string[];
   showCommunity: boolean;
   empty: ReactNode;
 }) {
@@ -67,7 +69,7 @@ export async function CalendarView(props: {
   );
 
   if (!month) {
-    const rows = await listUpcoming({ communityIds: props.communityIds, kind, limit: 150 }, now);
+    const rows = await listUpcoming({ communityIds: props.communityIds, itemIds: props.itemIds, kind, limit: 150 }, now);
     return (
       <>
         {controls}
@@ -89,7 +91,7 @@ export async function CalendarView(props: {
   const cells: string[] = [];
   for (let k = gridStart; k <= gridEnd; k = addDays(k, 1)) cells.push(k);
 
-  const rows = await listItems({ communityIds: props.communityIds, kind, from: zonedToUtc(gridStart), to: zonedToUtc(addDays(gridEnd, 1)), limit: 400 });
+  const rows = await listItems({ communityIds: props.communityIds, itemIds: props.itemIds, kind, from: zonedToUtc(gridStart), to: zonedToUtc(addDays(gridEnd, 1)), limit: 400 });
   const byDay = new Map<string, typeof rows>();
   for (const r of rows) {
     const start = dateKey(r.startsAt);

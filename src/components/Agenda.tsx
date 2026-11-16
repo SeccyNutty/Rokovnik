@@ -80,7 +80,7 @@ export function Agenda(props: { items: ItemView[]; todayKey: string; showCommuni
         open={!!open}
         onClose={() => setOpenId(null)}
         label={open?.title ?? "Opis"}
-        footer={open ? <AddToCalendar key={open.id} links={open.links} /> : null}
+        footer={open ? <AddToCalendar key={open.id} links={open.links} itemId={open.id} /> : null}
       >
         {open ? (
           <>

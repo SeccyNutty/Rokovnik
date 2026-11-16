@@ -52,7 +52,7 @@ export default async function ItemPage({ params }: Props) {
       <div className="paper paper--pad" style={{ padding: 22 }}>
         <ItemDetail item={item} heading="h1" />
         <div style={{ marginTop: 22 }}>
-          <AddToCalendar links={item.links} />
+          <AddToCalendar links={item.links} itemId={item.id} />
         </div>
       </div>
       <p className="note" style={{ marginTop: 14 }}>

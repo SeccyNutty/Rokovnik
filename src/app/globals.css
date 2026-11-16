@@ -458,6 +458,8 @@ p { margin: 0 0 12px; }
 
 .addcal__options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
 .addcal__options a { min-height: 48px; font-size: 15px; padding: 8px 10px; text-align: center; line-height: 1.2; }
+.addcal__inapp { grid-column: 1 / -1; }
+.addcal__inapp .btn { width: 100%; min-height: 48px; }
 .addcal__row { display: flex; gap: 8px; }
 .addcal__row .btn:first-child { flex: 1; }
 .addcal__hint { margin: 10px 0 0; font-size: 13.5px; color: var(--ink-3); }

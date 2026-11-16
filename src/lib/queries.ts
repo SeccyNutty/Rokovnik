@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { communities, communityRequests, items, messages, senderRules, type Community, type Item } from "@/db/schema";
 import { addEventLinks, type AddLinks } from "./calendar-links";
@@ -118,6 +118,8 @@ const itemColumns = {
 
 export type ItemFilter = {
   communityIds?: string[];
+  /** Pojedinačno spremljene stavke: prikazuju se uz stavke odabranih zajednica. */
+  itemIds?: string[];
   kind?: "event" | "deadline";
   /** Stavke koje još traju ili počinju nakon ovog trenutka. */
   from?: Date;
@@ -128,11 +130,19 @@ export type ItemFilter = {
 };
 
 export async function listItems(f: ItemFilter = {}): Promise<ItemRow[]> {
-  if (f.communityIds && f.communityIds.length === 0) return [];
+  const itemIds = f.itemIds ?? [];
+  if (f.communityIds && f.communityIds.length === 0 && itemIds.length === 0) return [];
   const db = await getDb();
+  const scope = !itemIds.length
+    ? f.communityIds
+      ? inArray(items.communityId, f.communityIds)
+      : undefined
+    : f.communityIds?.length
+      ? or(inArray(items.communityId, f.communityIds), inArray(items.id, itemIds))
+      : inArray(items.id, itemIds);
   const where = [
     f.includeHidden ? undefined : eq(items.status, "published"),
-    f.communityIds ? inArray(items.communityId, f.communityIds) : undefined,
+    scope,
     f.kind ? eq(items.kind, f.kind) : undefined,
     f.from ? gte(sql`coalesce(${items.endsAt}, ${items.startsAt})`, ts(f.from)) : undefined,
     f.to ? lt(items.startsAt, f.to) : undefined,

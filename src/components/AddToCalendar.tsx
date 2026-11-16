@@ -1,12 +1,16 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import type { AddLinks } from "@/lib/calendar-links";
+import { parseSaved, SAVED_COOKIE, serializeSaved } from "@/lib/saved";
 import { IconCalendarPlus } from "./icons";
 
-type Choice = keyof AddLinks;
+type External = keyof AddLinks;
+type Choice = External | "rokovnik";
 
-const OPTIONS: { key: Choice; label: string; short: string }[] = [
+const OPTIONS: { key: External; label: string; short: string }[] = [
   { key: "google", label: "Google kalendar", short: "Google kalendar" },
   { key: "ics", label: "Apple i ostali (.ics)", short: "Apple kalendar" },
   { key: "outlook", label: "Outlook.com", short: "Outlook" },
@@ -20,10 +24,24 @@ const CHANGE_EVENT = "rokovnik:kalendar-promjena";
 function readChoice(): Choice | null {
   try {
     const v = window.localStorage.getItem(STORAGE_KEY);
-    return OPTIONS.some((o) => o.key === v) ? (v as Choice) : null;
+    return v === "rokovnik" || OPTIONS.some((o) => o.key === v) ? (v as Choice) : null;
   } catch {
     return null;
   }
+}
+
+/** Sirova vrijednost kolačića sa spremljenim stavkama (tekst, da usporedba ostane stabilna). */
+function readSavedRaw(): string {
+  const hit = document.cookie.split("; ").find((c) => c.startsWith(`${SAVED_COOKIE}=`));
+  return hit ? hit.slice(SAVED_COOKIE.length + 1) : "";
+}
+
+function writeSaved(ids: string[]) {
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = ids.length
+    ? `${SAVED_COOKIE}=${serializeSaved(ids)}; Path=/; Max-Age=${400 * 24 * 3600}; SameSite=Lax${secure}`
+    : `${SAVED_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax${secure}`;
+  window.dispatchEvent(new Event(CHANGE_EVENT));
 }
 
 function subscribe(onChange: () => void): () => void {
@@ -36,13 +54,17 @@ function subscribe(onChange: () => void): () => void {
 }
 
 /**
- * "Dodaj u moj kalendar" za jedan događaj. Prvi put se bira aplikacija (dva klika),
- * izbor se pamti na uređaju pa je svako sljedeće dodavanje jedan klik.
+ * "Dodaj u moj kalendar" za jedan događaj: u Moj kalendar u Rokovniku (pamti se na uređaju,
+ * bez prijave) ili u vlastitu kalendarsku aplikaciju. Prvi put se bira odredište (dva klika),
+ * izbor se pamti pa je svako sljedeće dodavanje jedan klik.
  */
-export function AddToCalendar({ links }: { links: AddLinks }) {
-  // Zapamćeni izbor čita se s uređaja; na poslužitelju ga nema.
+export function AddToCalendar({ links, itemId }: { links: AddLinks; itemId: string }) {
+  const router = useRouter();
+  // Zapamćeni izbor i spremljene stavke čitaju se s uređaja; na poslužitelju ih nema.
   const choice = useSyncExternalStore(subscribe, readChoice, () => null);
+  const savedRaw = useSyncExternalStore(subscribe, readSavedRaw, () => "");
   const [open, setOpen] = useState(false);
+  const saved = parseSaved(savedRaw).includes(itemId.toLowerCase());
 
   const remember = (key: Choice) => {
     try {
@@ -53,19 +75,37 @@ export function AddToCalendar({ links }: { links: AddLinks }) {
     window.dispatchEvent(new Event(CHANGE_EVENT));
     setOpen(false);
   };
-  const linkProps = (key: Choice) =>
+  const toggleSaved = () => {
+    const id = itemId.toLowerCase();
+    const rest = parseSaved(readSavedRaw()).filter((x) => x !== id);
+    writeSaved(saved ? rest : [...rest, id]);
+    if (!saved) remember("rokovnik");
+    // Na stranici "Moj kalendar" popis se slaže na poslužitelju, pa ga treba osvježiti.
+    router.refresh();
+  };
+  const linkProps = (key: External) =>
     key === "ics" ? { href: links.ics } : { href: links[key], target: "_blank", rel: "noopener noreferrer" };
 
   const preferred = OPTIONS.find((o) => o.key === choice);
+  const inApp = (inList: boolean) => (
+    <button type="button" className={saved || inList ? "btn btn--quiet" : "btn"} aria-pressed={saved} onClick={toggleSaved}>
+      <IconCalendarPlus />
+      {saved ? "U Mom kalendaru · ukloni" : inList ? "Moj kalendar u Rokovniku" : "Dodaj u Moj kalendar"}
+    </button>
+  );
 
   return (
     <div className="addcal">
-      {preferred && !open ? (
+      {(preferred || choice === "rokovnik" || saved) && !open ? (
         <div className="addcal__row">
-          <a className="btn" {...linkProps(preferred.key)}>
-            <IconCalendarPlus />
-            Dodaj u {preferred.short}
-          </a>
+          {preferred && !saved ? (
+            <a className="btn" {...linkProps(preferred.key)}>
+              <IconCalendarPlus />
+              Dodaj u {preferred.short}
+            </a>
+          ) : (
+            inApp(false)
+          )}
           <button type="button" className="btn btn--quiet" onClick={() => setOpen(true)}>
             Drugi
           </button>
@@ -78,12 +118,20 @@ export function AddToCalendar({ links }: { links: AddLinks }) {
       )}
       {open ? (
         <div className="addcal__options">
+          <div className="addcal__inapp">{inApp(true)}</div>
           {OPTIONS.map((o) => (
             <a key={o.key} className="btn btn--quiet" {...linkProps(o.key)} onClick={() => remember(o.key)}>
               {o.label}
             </a>
           ))}
         </div>
+      ) : null}
+      {saved ? (
+        <p className="addcal__hint">
+          Spremljeno na ovom uređaju. <Link href="/moj">Otvori Moj kalendar</Link>
+        </p>
+      ) : open ? (
+        <p className="addcal__hint">Moj kalendar je ovdje u Rokovniku, bez prijave. Ostalo otvara tvoju kalendarsku aplikaciju.</p>
       ) : null}
     </div>
   );
