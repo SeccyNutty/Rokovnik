@@ -20,7 +20,7 @@ Oznake u tablicama:
 
 | Funkcija | Stanje | Napomena |
 |---|---|---|
-| Primanje maila (Resend webhook, potpis) | Produkcija | adresa `objavi@crisoulkea.resend.app` |
+| Primanje maila (Resend webhook, potpis) | Produkcija | adresa za objave na Resendovoj domeni (`INBOUND_ADDRESS`) |
 | Svrstavanje u zajednicu po domeni pošiljatelja | Produkcija | javni servisi (gmail…) vežu se uz točnu adresu |
 | Zahtjev za novu zajednicu i potvrda jednim klikom | Produkcija | iz administracije ili poveznicom iz maila |
 | Potvrda je trenutna, obrada ide u pozadini | Lokalno | na Netlifyju provjeriti da mail prijeđe iz „u obradi” u „objavljeno” |
