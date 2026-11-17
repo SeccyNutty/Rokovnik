@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
-import { communities, communityRequests, items, messages, senderRules, type Community, type Item } from "@/db/schema";
+import { communities, communityManagers, communityRequests, items, messages, senderRules, type Community, type Item } from "@/db/schema";
 import { cachedQuery } from "./cache";
 import { addEventLinks, type AddLinks } from "./calendar-links";
 import { CATEGORY_LABELS, type Category } from "./extract/types";
@@ -306,4 +306,46 @@ export async function relatedCommunities(request: { kind: "domain" | "address"; 
     .where(eq(senderRules.kind, "domain"));
   const parents = candidateDomains(request.value).slice(1);
   return rows.filter((r) => parents.includes(r.domain) || r.domain.endsWith(`.${request.value}`));
+}
+
+
+/** Zadržani mailovi (nedokazan pošiljatelj ili adresa izvan popisa), po zajednicama. */
+export async function listHeldMessages(communityIds?: string[]) {
+  if (communityIds && !communityIds.length) return [];
+  const db = await getDb();
+  return db
+    .select({ id: messages.id, communityId: messages.communityId, subject: messages.subject, senderAddress: messages.senderAddress, error: messages.error, receivedAt: messages.receivedAt })
+    .from(messages)
+    .where(and(eq(messages.status, "held"), communityIds ? inArray(messages.communityId, communityIds) : undefined))
+    .orderBy(desc(messages.createdAt))
+    .limit(100);
+}
+
+export async function listManagers(communityIds?: string[]) {
+  if (communityIds && !communityIds.length) return [];
+  const db = await getDb();
+  return db
+    .select()
+    .from(communityManagers)
+    .where(communityIds ? inArray(communityManagers.communityId, communityIds) : undefined)
+    .orderBy(asc(communityManagers.email));
+}
+
+export async function listRulesFor(communityIds: string[]) {
+  if (!communityIds.length) return [];
+  const db = await getDb();
+  return db.select().from(senderRules).where(inArray(senderRules.communityId, communityIds)).orderBy(asc(senderRules.value));
+}
+
+/** Objave zajednica kojima korisnik upravlja (uključujući skrivene). */
+export async function listItemsForManager(communityIds: string[], limit = 60): Promise<ItemRow[]> {
+  if (!communityIds.length) return [];
+  const db = await getDb();
+  return db
+    .select(itemColumns)
+    .from(items)
+    .innerJoin(communities, eq(items.communityId, communities.id))
+    .where(inArray(items.communityId, communityIds))
+    .orderBy(desc(items.startsAt))
+    .limit(limit);
 }

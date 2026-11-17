@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarView, type SearchParams } from "@/components/CalendarView";
+import { FollowButton } from "@/components/FollowButton";
 import { Subscribe } from "@/components/Subscribe";
 import { baseUrl } from "@/lib/base-url";
 import { inboundAddress } from "@/lib/config";
@@ -33,7 +34,10 @@ export default async function CommunityPage({ params, searchParams }: Props) {
           <h1>{community.name}</h1>
           {community.description ? <p className="lead">{community.description}</p> : null}
           <div className="only-mobile" style={{ marginTop: 14 }}>
-            <Subscribe baseUrl={origin} feedPath={`/ics/${community.slug}.ics`} name={community.name} block />
+            <div style={{ display: "grid", gap: 8 }}>
+              <FollowButton slug={community.slug} name={community.name} block />
+              <Subscribe baseUrl={origin} feedPath={`/ics/${community.slug}.ics`} name={community.name} block />
+            </div>
           </div>
         </div>
         <CalendarView
@@ -51,6 +55,9 @@ export default async function CommunityPage({ params, searchParams }: Props) {
       </div>
       <aside className="split__aside">
         <div className="only-desktop">
+<div style={{ marginBottom: 8 }}>
+            <FollowButton slug={community.slug} name={community.name} block />
+          </div>
           <Subscribe baseUrl={origin} feedPath={`/ics/${community.slug}.ics`} name={community.name} block />
           <p className="note" style={{ marginTop: 12 }}>
             Kalendar dodaješ jednom, a nove objave stižu same. Pojedini događaj možeš dodati i zasebno: klikni na njega.

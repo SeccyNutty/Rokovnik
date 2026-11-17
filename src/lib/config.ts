@@ -15,8 +15,8 @@ function list(value: string | undefined): string[] {
 /** Tajna za potpisivanje kolačića i poveznica za potvrdu. */
 export function appSecret(): string {
   const s = process.env.APP_SECRET;
-  if (s && s.length >= 16) return s;
-  if (isProd) throw new Error("APP_SECRET nije postavljen (najmanje 16 znakova).");
+  if (s && s.length >= 32) return s;
+  if (isProd) throw new Error("APP_SECRET nije postavljen ili je prekratak (najmanje 32 znaka).");
   return "rokovnik-dev-secret-not-for-production";
 }
 
@@ -25,6 +25,14 @@ export function adminPassword(): string | null {
   const p = process.env.ADMIN_PASSWORD;
   if (p) return p;
   return isProd ? null : "rokovnik";
+}
+
+/** Google računi koji su administratori (ADMIN_EMAILS, uz ADMIN_EMAIL). */
+export function adminEmails(): string[] {
+  const all = new Set(list(process.env.ADMIN_EMAILS));
+  const one = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  if (one) all.add(one);
+  return [...all];
 }
 
 /** Kamo se šalju zahtjevi za nove zajednice. */

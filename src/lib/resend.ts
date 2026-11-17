@@ -18,7 +18,7 @@ export function canSendEmail(): boolean {
   return !!process.env.RESEND_API_KEY;
 }
 
-export async function sendEmail(msg: { to: string; subject: string; text: string; html?: string }): Promise<void> {
+export async function sendEmail(msg: { to: string; subject: string; text: string; html?: string; headers?: Record<string, string> }): Promise<void> {
   const res = await fetch(`${API}/emails`, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey()}`, "Content-Type": "application/json" },
@@ -29,6 +29,7 @@ export async function sendEmail(msg: { to: string; subject: string; text: string
       subject: msg.subject,
       text: msg.text,
       html: msg.html,
+      headers: msg.headers,
     }),
     signal: AbortSignal.timeout(15_000),
   });

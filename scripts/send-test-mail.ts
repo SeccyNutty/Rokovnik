@@ -21,6 +21,8 @@ async function main() {
     subject: arg("subject") ?? "Testna obavijest",
     text: file ? readFileSync(file, "utf8") : (arg("text") ?? ""),
     date: new Date().toISOString(),
+    // Tko ima INBOUND_SECRET jamči za pošiljatelja. --nedokazan šalje mail bez dokaza (završit će na ručnoj odluci).
+    auth: process.argv.includes("--nedokazan") ? undefined : { spf: "pass", dkim: "pass", dmarc: "pass" },
   });
   const url = `${(arg("url") ?? "http://localhost:3000").replace(/\/+$/, "")}/api/inbound/generic`;
   const res = await fetch(url, {

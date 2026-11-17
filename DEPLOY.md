@@ -98,6 +98,9 @@ Registriraj se **e-mail adresom na koju želiš primati zahtjeve za nove zajedni
 | `INBOUND_ADDRESS` | iz koraka 3 |
 | `ADMIN_EMAIL` | tvoja adresa (ista kao Resend račun) |
 | `RESEND_WEBHOOK_SECRET` | dodaješ nakon koraka 5 |
+| `APP_URL` | javna adresa, npr. `https://rokovnikhr.netlify.app` (sve poveznice u mailovima i prijava grade se od nje) |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | iz koraka 7 (računi) |
+| `ADMIN_EMAILS` | Google adrese administratora, odvojene zarezom |
 
 3. Deploy. Provjera: `https://<tvoja-stranica>/api/health` treba vratiti `"ok": true` i `"izvlacenje": "ai"`.
 
@@ -121,6 +124,33 @@ Kopiraj **Signing secret** (počinje s `whsec_`) u varijablu `RESEND_WEBHOOK_SEC
    - okružnica se obradi i objavi, a sljedeće s iste domene objavljuju se odmah.
 3. Otvori zajednicu, klikni na događaj i isprobaj **Dodaj u moj kalendar** te **Prati u svom kalendaru** na mobitelu i na računalu.
 
+## 7. Računi: prijava putem Googlea
+
+Bez ovog koraka stranica radi, ali gosti ne mogu otvoriti račun (Moj kalendar, praćenje zajednica), a administracija radi samo s lozinkom.
+
+1. Otvori [Google Cloud Console](https://console.cloud.google.com/) i napravi projekt (npr. „Rokovnik”).
+2. **Google Auth Platform** (u starijem izborniku: *APIs & Services → OAuth consent screen*):
+   - naziv aplikacije „Rokovnik”, e-mail za podršku, tip korisnika **External**;
+   - dozvole (scopes): samo `openid`, `email`, `profile`. To su osnovne dozvole, pa Google aplikaciju ne mora pregledavati;
+   - status objave prebaci na **In production**. Dok je u statusu *Testing*, prijaviti se mogu samo adrese upisane kao testni korisnici.
+3. **Clients** (*Credentials → Create credentials → OAuth client ID*), vrsta **Web application**. Pod **Authorized redirect URIs** dodaj:
+   - `https://rokovnikhr.netlify.app/api/auth/google/callback`
+   - `http://localhost:3000/api/auth/google/callback` (za lokalni rad)
+4. Kopiraj **Client ID** i **Client secret** u Netlify (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, označi kao tajne) i u `.env.local`.
+5. U `ADMIN_EMAILS` upiši svoju Google adresu. Pokreni novi deploy.
+
+Provjera: na stranici klikni **Prijava**, prijavi se i otvori **Moj račun**. Uz ime mora pisati „Administrator”.
+
+### Tri vrste računa
+
+| Račun | Tko | Što smije |
+|---|---|---|
+| **Korisnik** | svatko tko se prijavi | Moj kalendar: prati zajednice, sprema događaje, osobna pretplata (ICS) |
+| **Organizacija** | Google adresa koju administrator doda kao upravitelja zajednice | uz to: opis zajednice, tko smije objavljivati, odluka o zadržanim mailovima, sakrivanje objava (`/organizacija`) |
+| **Administrator** | adrese iz `ADMIN_EMAILS` | sve: potvrda zajednica, upravitelji, stroga ili blaža provjera pošiljatelja, testni mail (`/admin`) |
+
+Upravitelja dodaješ u `/admin` → zajednica → *Upravitelji*. Ovlasti se provjeravaju u bazi pri svakoj radnji, pa uklanjanje upravitelja ili administratora vrijedi odmah. Lozinka (`ADMIN_PASSWORD`) ostaje kao rezervni ulaz u administraciju.
+
 ## Brzina
 
 Aplikacija javne upite drži u predmemoriji i poništava je pri svakoj objavi, pa većina otvaranja stranice ne ide do baze. Tri postavke izvan koda još utječu na brzinu:
@@ -136,7 +166,10 @@ U Gmailu: *Postavke → Prosljeđivanje* (ili filtar za pošiljatelja okružnica
 ## Što treba znati prije javne objave
 
 - **Trajanje obrade.** Mail se obrađuje unutar webhook zahtjeva (AI poziv traje nekoliko sekundi, s PDF privitkom dulje). Ako hosting prekine zahtjev, Resend ponavlja isporuku, a aplikacija tada dovršava prekinutu obradu; poruku možeš i ručno pokrenuti u `/admin` → *Obradi ponovno*. Provjeri ograničenje trajanja funkcija na svom planu.
-- **Provjera pošiljatelja.** Mail se odbija ako ne prođe DMARC, odnosno ni SPF ni DKIM. Domene bez tih zapisa nije moguće pouzdano razlikovati od lažiranih, pa prije širenja na više organizacija vrijedi pooštriti pravilo (npr. zahtijevati DMARC).
+- **Provjera pošiljatelja.** Automatski se objavljuje samo mail čija je domena dokazana DMARC provjerom (rezultat računa Resend pri primitku, ne može se podmetnuti u poruci). Mail koji izričito padne provjeru odbija se, a mail bez dokaza (domena bez DMARC zapisa) čeka ručnu odluku u `/admin` ili `/organizacija`. Za domenu koja nema DMARC administrator može za tu zajednicu uključiti blažu provjeru (SPF + DKIM), uz manju zaštitu. Zajednica može dopustiti objavu samo s popisa adresa. Prije potvrde nove zajednice provjeri upozorenje „Pošiljatelj nije dokazan”.
+- **Povratne poruke objaviteljima.** Nakon obrade pošiljatelj dobiva mail s ishodom i poveznicom na zajednicu (samo dokazanim pošiljateljima, nikad na automatske odgovore, najviše 20 dnevno po adresi). **Bez vlastite domene u Resendu poruke stižu samo na adresu vlasnika Resend računa**, pa organizacije povratnu poruku dobivaju tek nakon što dodaš domenu i postaviš `RESEND_FROM`. Isključivanje: `FEEDBACK_EMAILS=off`.
+- **Ograničenja učestalosti.** Najviše 60 mailova dnevno po pošiljatelju, ograničeni pokušaji prijave lozinkom i putem Googlea. Brojači su u bazi, pa vrijede za sve instance poslužitelja.
+- **Dnevnik radnji.** Potvrde zajednica, sakrivanja, promjene postavki, upravitelji i prijave bilježe se u tablicu `audit_log`.
 - **Dopuštenje za objavu.** Okružnice mogu biti interne. Prije javnog dijeljenja FSB zajednice dogovori s fakultetom što se smije objaviti.
 - **Vlastita domena.** Za adresu poput `objavi@tvoja-domena.hr` i slanje obavijesti drugim adresama dodaj domenu u Resendu (MX i DKIM zapisi) te postavi `RESEND_FROM`. Za primanje koristi poddomenu, jer MX zapis preusmjerava svu poštu te domene.
-- **Lozinka administratora** je jedina zaštita `/admin`: neka bude duga i jedinstvena.
+- **Lozinka administratora** je rezervni ulaz u `/admin`: neka bude duga i jedinstvena. Kad Google prijava radi, možeš je isključiti brisanjem `ADMIN_PASSWORD` (tada je administracija dostupna samo računima iz `ADMIN_EMAILS`).

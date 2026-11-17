@@ -1,7 +1,11 @@
-import { and, eq, or, sql } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { getDb, type Db } from "@/db";
+import { items as itemsTable } from "@/db/schema";
 import { communities, communityRequests, items, messages, senderRules, type Community, type CommunityRequest, type Message, type NewItem } from "@/db/schema";
 import { touchData } from "./cache";
+import { sendPublisherFeedback, type FeedbackInput } from "./feedback";
+import { allow } from "./ratelimit";
+import { senderVerdict } from "./sender-auth";
 import { adminEmail, APP_NAME, configuredBaseUrl, forwarderEmails } from "./config";
 import { extractItems, llmProvider, type ExtractedItem, type Extractor } from "./extract";
 import { canSendEmail, loadReceivedAttachments, sendEmail } from "./resend";
@@ -28,6 +32,10 @@ export type InboundEmail = {
   receivedAt: Date;
   auth?: { spf?: string; dkim?: string; dmarc?: string } | null;
   hasAttachments?: boolean;
+  /** Mail je unio prijavljeni administrator (testni mail): pošiljatelja ne treba dokazivati. */
+  trusted?: boolean;
+  /** Automatski ili masovni mail: ne šalje se povratna poruka. */
+  automated?: boolean;
 };
 
 export type Attachment = { filename: string; contentType: string; dataBase64: string };
@@ -38,6 +46,8 @@ export type PipelineDeps = {
   loadAttachments?: (message: Message) => Promise<Attachment[]>;
   baseUrl?: string | null;
   forwarders?: string[];
+  /** Povratna poruka pošiljatelju; zadano šalje mail preko Resenda. */
+  feedback?: (input: FeedbackInput) => Promise<void>;
 };
 
 export type IngestResult = {
@@ -70,19 +80,6 @@ export function htmlToText(html: string | null | undefined): string {
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
-}
-
-/**
- * Provjera da mail stvarno dolazi s domene koju navodi. Odbijamo kad DMARC ne
- * prolazi ili kad ne prolaze ni SPF ni DKIM; bez podataka (testni unos) puštamo.
- */
-export function senderAuthOk(auth: InboundEmail["auth"]): boolean {
-  if (!auth) return true;
-  const v = (s?: string) => (s ?? "").toLowerCase();
-  if (v(auth.dmarc) === "fail") return false;
-  if (v(auth.dmarc) === "pass") return true;
-  if (v(auth.spf) === "fail" && v(auth.dkim) === "fail") return false;
-  return true;
 }
 
 function safeUrl(u: string | null): string | null {
@@ -138,7 +135,7 @@ export function toNewItem(x: ExtractedItem, communityId: string, messageId: stri
  * NE svrstavaju automatski pod širu domenu (pmf.unizg.hr nije isto što i unizg.hr):
  * za njih nastaje zahtjev, a administrator jednim klikom bira novu ili postojeću zajednicu.
  */
-async function findCommunityFor(db: Db, sender: string): Promise<string | null> {
+async function findCommunityFor(db: Db, sender: string): Promise<{ community: Community; byAddress: boolean } | null> {
   const key = requestKeyFor(sender);
   const rules = await db
     .select()
@@ -150,7 +147,9 @@ async function findCommunityFor(db: Db, sender: string): Promise<string | null> 
       ),
     );
   if (!rules.length) return null;
-  return (rules.find((r) => r.kind === "address") ?? rules[0]).communityId;
+  const rule = rules.find((r) => r.kind === "address") ?? rules[0];
+  const [community] = await db.select().from(communities).where(eq(communities.id, rule.communityId));
+  return community ? { community, byAddress: rule.kind === "address" } : null;
 }
 
 async function defaultNotifyAdmin(request: CommunityRequest, baseUrl: string | null): Promise<void> {
@@ -199,8 +198,9 @@ export async function ingestEmail(email: InboundEmail, deps: PipelineDeps = {}):
   let senderName = from.name;
   let forwardedBy: string | null = null;
 
-  const authOk = senderAuthOk(email.auth);
-  if (authOk && (deps.forwarders ?? forwarderEmails()).includes(from.address)) {
+  // Dokaz pošiljatelja. Prije nego znamo zajednicu vrijedi stroga provjera.
+  let verdict = email.trusted ? "trusted" : senderVerdict(email.auth, "strict");
+  if (verdict === "trusted" && (deps.forwarders ?? forwarderEmails()).includes(from.address)) {
     const original = findForwardedOriginal(text);
     if (original) {
       forwardedBy = from.address;
@@ -223,6 +223,8 @@ export async function ingestEmail(email: InboundEmail, deps: PipelineDeps = {}):
     receivedAt: email.receivedAt,
     auth: email.auth ?? null,
     hasAttachments: !!email.hasAttachments,
+    verified: verdict === "trusted",
+    automated: !!email.automated,
   };
 
   const insert = async (values: typeof messages.$inferInsert): Promise<Message | null> => {
@@ -234,15 +236,30 @@ export async function ingestEmail(email: InboundEmail, deps: PipelineDeps = {}):
       ? { messageId: m.id, status: m.status, duplicate: false, communityId: m.communityId, requestId: m.requestId, itemIds: [], ...extra }
       : { messageId: "", status: "processing", duplicate: true, communityId: null, requestId: null, itemIds: [] };
 
-  if (!authOk || !sender.includes("@")) {
+  if (verdict === "rejected" || !sender.includes("@")) {
     return done(await insert({ ...base, status: "unauthenticated", error: "Mail nije prošao provjeru pošiljatelja (SPF/DKIM/DMARC)." }));
   }
+  // Zaštita od zatrpavanja: jedan pošiljatelj najviše 60 mailova na dan.
+  if (!email.trusted && !(await allow(`mail:${from.address}`, 60, 24 * 3600))) {
+    return done(await insert({ ...base, status: "rejected", error: "Previše mailova s iste adrese u jednom danu." }));
+  }
 
-  const communityId = await findCommunityFor(db, sender);
-  if (communityId) {
-    const m = await insert({ ...base, communityId, status: "processing" });
+  const match = await findCommunityFor(db, sender);
+  if (match) {
+    const { community } = match;
+    // Zajednica može dopustiti blažu provjeru (domene bez DMARC zapisa). Za proslijeđene mailove
+    // povjerenje dolazi od prosljeđivača, koji je već dokazan.
+    if (verdict !== "trusted" && !forwardedBy) verdict = senderVerdict(email.auth, community.authMode);
+    let hold: string | null = null;
+    if (verdict !== "trusted") hold = "Pošiljatelj nije dokazan: domena nema DMARC potvrdu. Objavi ručno ili promijeni provjeru za ovu zajednicu.";
+    else if (community.senderMode === "addresses" && !match.byAddress) hold = "Adresa pošiljatelja nije na popisu dopuštenih za ovu zajednicu.";
+    if (hold) {
+      const held = await insert({ ...base, verified: verdict === "trusted", communityId: community.id, status: "held", error: hold });
+      return done(held);
+    }
+    const m = await insert({ ...base, verified: true, communityId: community.id, status: "processing" });
     if (!m) return done(null);
-    const processed = await processMessage(m.id, deps);
+    const processed = await processMessage(m.id, deps, { notify: true });
     return done(m, { status: processed.status, itemIds: processed.itemIds });
   }
 
@@ -254,7 +271,7 @@ export async function ingestEmail(email: InboundEmail, deps: PipelineDeps = {}):
     const name = suggestCommunityName(key, senderName);
     [request] = await db
       .insert(communityRequests)
-      .values({ kind: key.kind, value: key.value, suggestedName: name, suggestedSlug: slugify(name), sampleFrom: senderName ? `${senderName} <${sender}>` : sender, sampleSubject: subject })
+      .values({ kind: key.kind, value: key.value, suggestedName: name, suggestedSlug: slugify(name), sampleFrom: senderName ? `${senderName} <${sender}>` : sender, sampleSubject: subject, verified: verdict === "trusted" })
       .onConflictDoNothing()
       .returning();
     if (request) isNew = true;
@@ -269,6 +286,7 @@ export async function ingestEmail(email: InboundEmail, deps: PipelineDeps = {}):
     isNew = true;
   }
   const m = await insert({ ...base, requestId: request.id, status: "pending_community" });
+  if (m && verdict === "trusted") await notifySender(m, null, { status: "pending_community", itemIds: [] }, deps);
   if (m && isNew) {
     try {
       await (deps.notifyAdmin ?? defaultNotifyAdmin)(request, deps.baseUrl ?? configuredBaseUrl());
@@ -282,7 +300,17 @@ export async function ingestEmail(email: InboundEmail, deps: PipelineDeps = {}):
 export type ProcessResult = { status: Message["status"]; itemIds: string[]; error?: string };
 
 /** Izvlači stavke iz spremljenog maila i objavljuje ih. Može se ponoviti bez dupliciranja. */
-export async function processMessage(messageId: string, deps: PipelineDeps = {}): Promise<ProcessResult> {
+/** Povratna poruka pošiljatelju. Nikad ne ruši obradu. */
+async function notifySender(message: Message, community: Community | null, result: ProcessResult, deps: PipelineDeps): Promise<void> {
+  try {
+    const items = result.itemIds.length ? await (await getDb()).select().from(itemsTable).where(inArray(itemsTable.id, result.itemIds)) : [];
+    await (deps.feedback ?? sendPublisherFeedback)({ message, community, status: result.status, items, baseUrl: deps.baseUrl ?? configuredBaseUrl() });
+  } catch (e) {
+    console.error("Povratna poruka pošiljatelju nije poslana:", e);
+  }
+}
+
+export async function processMessage(messageId: string, deps: PipelineDeps = {}, opts: { notify?: boolean } = {}): Promise<ProcessResult> {
   const db = await getDb();
   const [message] = await db.select().from(messages).where(eq(messages.id, messageId));
   if (!message) return { status: "failed", itemIds: [], error: "Poruka ne postoji." };
@@ -338,6 +366,10 @@ export async function processMessage(messageId: string, deps: PipelineDeps = {})
     const status: Message["status"] = itemIds.length ? "published" : "no_items";
     await db.update(messages).set({ status, extractor: result.extractor, processedAt: new Date(), error: null }).where(eq(messages.id, messageId));
     await touchData();
+    if (opts.notify) {
+      const [community] = await db.select().from(communities).where(eq(communities.id, message.communityId));
+      await notifySender(message, community ?? null, { status, itemIds }, deps);
+    }
     return { status, itemIds };
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e);
@@ -410,7 +442,7 @@ export async function approveRequest(
     input.defer(async () => {
       for (const m of waiting) {
         try {
-          await processMessage(m.id, deps);
+          await processMessage(m.id, deps, { notify: true });
         } catch (e) {
           console.error("Naknadna obrada poruke nije uspjela", m.id, e);
         }
@@ -420,7 +452,7 @@ export async function approveRequest(
   }
 
   const processed: ProcessResult[] = [];
-  for (const m of waiting) processed.push(await processMessage(m.id, deps));
+  for (const m of waiting) processed.push(await processMessage(m.id, deps, { notify: true }));
   return { community, published: processed.reduce((n, p) => n + p.itemIds.length, 0), processed, deferred: 0 };
 }
 
@@ -438,4 +470,23 @@ export async function rejectRequest(requestId: string): Promise<boolean> {
     .set({ status: "rejected", error: "Pošiljatelj je odbijen." })
     .where(and(eq(messages.requestId, requestId), eq(messages.status, "pending_community")));
   return true;
+}
+
+
+/** Zadržani mail (nedokazan pošiljatelj ili adresa izvan popisa): ručna objava. */
+export async function releaseMessage(messageId: string, deps: PipelineDeps = {}): Promise<ProcessResult | null> {
+  const db = await getDb();
+  const [m] = await db.select().from(messages).where(eq(messages.id, messageId));
+  if (!m || m.status !== "held" || !m.communityId) return null;
+  return processMessage(messageId, deps, { notify: m.verified });
+}
+
+export async function discardMessage(messageId: string): Promise<boolean> {
+  const db = await getDb();
+  const rows = await db
+    .update(messages)
+    .set({ status: "rejected", error: "Odbačeno ručno.", processedAt: new Date() })
+    .where(and(eq(messages.id, messageId), eq(messages.status, "held")))
+    .returning({ id: messages.id });
+  return rows.length > 0;
 }

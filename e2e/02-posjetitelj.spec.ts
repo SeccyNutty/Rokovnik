@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { expectNoHorizontalScroll, future, LECTURE, ORG, WORKSHOP } from "./helpers";
+import { expectNoHorizontalScroll, future, LECTURE, nextGoogleUser, ORG, userFor, WORKSHOP } from "./helpers";
 
 /** Ono što vidi posjetitelj, na računalu i na mobitelu (isti testovi u oba projekta). */
 
@@ -54,37 +54,58 @@ test("klik na događaj otvara opis s poveznicama za kalendare", async ({ page, r
   expect(body).toContain(WORKSHOP);
 });
 
-test("Dodaj u Moj kalendar: događaj se sprema na uređaju i može se ukloniti", async ({ page }) => {
-  await page.goto("/moj?z=");
-  await expect(page.getByRole("heading", { name: "Odaberi zajednicu ili dodaj događaj" })).toBeVisible();
-
+test("gost: Dodaj u Moj kalendar traži prijavu, a nakon prijave putem Googlea događaj je spremljen", async ({ page }, info) => {
   await page.goto(`/z/${ORG.slug}`);
   await page.getByRole("button", { name: new RegExp(WORKSHOP) }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "Dodaj u moj kalendar" }).click();
   await dialog.getByRole("button", { name: "Moj kalendar u Rokovniku" }).click();
-  await expect(dialog.getByRole("button", { name: /U Mom kalendaru/ })).toBeVisible();
-  await dialog.getByRole("link", { name: "Otvori Moj kalendar" }).click();
 
-  await expect(page).toHaveURL(/\/moj/);
+  const prompt = page.getByRole("dialog", { name: "Za Moj kalendar trebaš račun" });
+  await expect(prompt).toBeVisible();
+  // Vanjski kalendari i dalje rade bez računa.
+  await expect(dialog.getByRole("link", { name: "Google kalendar" })).toHaveCount(1);
+
+  await nextGoogleUser(page.request, userFor(info.project.name, "spremac"));
+  await prompt.getByRole("link", { name: "Prijavi se putem Googlea" }).click();
+  // Povratak na istu stranicu, radnja je već izvršena.
+  await expect(page).toHaveURL(new RegExp(`/z/${ORG.slug}.*prijava=spremljeno`));
+  await page.goto("/moj");
   await expect(page.getByRole("button", { name: new RegExp(WORKSHOP) })).toBeVisible();
   await expect(page.getByRole("button", { name: new RegExp(LECTURE) })).toHaveCount(0);
 
+  // Uklanjanje iz Mog kalendara.
   await page.getByRole("button", { name: new RegExp(WORKSHOP) }).click();
   await page.getByRole("dialog").getByRole("button", { name: /U Mom kalendaru/ }).click();
-  await expect(page.getByRole("heading", { name: "Odaberi zajednicu ili dodaj događaj" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Zaprati zajednicu ili dodaj događaj" })).toBeVisible();
 });
 
-test("Moj kalendar: odabir zajednice prikazuje njezine objave i pamti izbor", async ({ page }) => {
-  await page.goto("/moj?z=");
-  await page.getByRole("checkbox", { name: new RegExp(ORG.name) }).first().click();
-  await expect(page.getByRole("checkbox", { name: new RegExp(ORG.name) }).first()).toBeChecked();
-  await expect(page).toHaveURL(new RegExp(`z=${ORG.slug}`));
-  await expect(page.getByRole("button", { name: new RegExp(LECTURE) }).first()).toBeVisible();
-  // Povratak bez parametra: izbor se vraća iz memorije uređaja.
+test("gost: Zaprati zajednicu traži prijavu, a nakon prijave zajednica je u Mom kalendaru", async ({ page }, info) => {
+  await page.goto(`/z/${ORG.slug}`);
+  // Gumb je vidljiv jednom (mobilni i bočni blok ne smiju se prikazati zajedno).
+  await expect(page.getByRole("button", { name: "Zaprati zajednicu" })).toHaveCount(1);
+  await page.getByRole("button", { name: "Zaprati zajednicu" }).click();
+  const prompt = page.getByRole("dialog", { name: "Za praćenje trebaš račun" });
+  await expect(prompt).toBeVisible();
+  await nextGoogleUser(page.request, userFor(info.project.name, "pratitelj"));
+  await prompt.getByRole("link", { name: "Prijavi se putem Googlea" }).click();
+  await expect(page).toHaveURL(/prijava=praceno/);
+  await expect(page.getByRole("button", { name: /Pratiš/ }).first()).toBeVisible();
+
   await page.goto("/moj");
-  await expect(page).toHaveURL(new RegExp(`z=${ORG.slug}`));
+  await expect(page.getByRole("checkbox", { name: new RegExp(ORG.name) }).first()).toBeChecked();
+  await expect(page.getByRole("button", { name: new RegExp(LECTURE) }).first()).toBeVisible();
   await expectNoHorizontalScroll(page);
+
+  // Prestanak praćenja iz Mog kalendara.
+  await page.getByRole("checkbox", { name: new RegExp(ORG.name) }).first().click();
+  await expect(page.getByRole("heading", { name: "Zaprati zajednicu ili dodaj događaj" })).toBeVisible();
+});
+
+test("gost: Moj kalendar nudi prijavu umjesto sadržaja", async ({ page }) => {
+  await page.goto("/moj");
+  await expect(page.getByRole("link", { name: "Prijavi se putem Googlea" })).toBeVisible();
+  await expect(page.getByRole("checkbox")).toHaveCount(0);
 });
 
 test("stranica događaja radi samostalno, a nepostojeća vraća 404", async ({ page }) => {
@@ -129,6 +150,9 @@ test("sigurnosna zaglavlja: obične stranice se ne mogu ugraditi u tuđi okvir",
   const home = await request.get("/");
   expect(home.headers()["x-frame-options"]).toBe("SAMEORIGIN");
   expect(home.headers()["x-content-type-options"]).toBe("nosniff");
+  expect(home.headers()["content-security-policy"]).toContain("frame-ancestors 'self'");
+  expect(home.headers()["content-security-policy"]).toContain("object-src 'none'");
+  expect(home.headers()["strict-transport-security"]).toContain("max-age=");
   const embed = await request.get(`/ugradi/${ORG.slug}`);
   expect(embed.headers()["x-frame-options"]).toBeUndefined();
   expect(embed.headers()["content-security-policy"]).toContain("frame-ancestors *");

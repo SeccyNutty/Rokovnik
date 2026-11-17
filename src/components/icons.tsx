@@ -19,6 +19,9 @@ export const IconBookmark = () => (
 export const IconSend = () => (
   <svg {...base}><path d="M4 6h16v12H4z" /><path d="m4 7 8 6 8-6" /></svg>
 );
+export const IconUser = () => (
+  <svg {...base}><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.500 2 8 6" /></svg>
+);
 export const IconClose = () => (
   <svg {...base}><path d="M6 6l12 12M18 6 6 18" /></svg>
 );

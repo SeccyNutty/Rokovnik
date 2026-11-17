@@ -19,7 +19,7 @@ export function Subscribe(props: { baseUrl: string; feedPath: string; name: stri
 
   return (
     <>
-      <button type="button" className={props.block ? "btn btn--block" : "btn"} onClick={() => setOpen(true)}>
+      <button type="button" className={props.block ? "btn btn--block" : "btn"} onClick={() => setOpen(true)} data-feed={`${props.baseUrl}${props.feedPath}`}>
         <IconBell />
         {props.label ?? "Prati u svom kalendaru"}
       </button>

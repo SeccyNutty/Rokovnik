@@ -1,0 +1,10 @@
+Od: Studentski zbor FSB <zbor@fsb.unizg.hr>
+Naslov: Hackathon Pametna tvornica – prijave otvorene
+
+Bok svima!
+
+Studentski zbor FSB-a i tvrtka Primjer d.o.o. organiziraju 24-satni hackathon „Pametna tvornica”. Hackathon počinje u subotu, 16. siječnja 2027. u 10:00 i završava u nedjelju, 17. siječnja 2027. u 10:00, u Laboratoriju za proizvodno inženjerstvo (zgrada C, 2. kat).
+
+Timovi imaju 2 do 4 člana. Prijave timova primamo do petka, 8. siječnja 2027. do 23:59 na https://hackathon.example/prijava.
+
+Nagradni fond je 3.000 eura. Hrana i piće osigurani.

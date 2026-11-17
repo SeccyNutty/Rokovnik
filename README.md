@@ -32,7 +32,18 @@ flowchart LR
 - **Popis po danima** (zadani prikaz, prilagođen mobitelu) i **mjesec**; filtar *sve / događaji / rokovi*. Rokovi su istaknuti crvenom.
 - **Klik na događaj otvara opis**, a na dnu je **„Dodaj u moj kalendar”** (Google, Outlook.com, Microsoft 365, Apple i ostali preko .ics). Izbor aplikacije se pamti, pa je svako sljedeće dodavanje jedan klik.
 - **„Prati u svom kalendaru”**: pretplata na cijeli kalendar zajednice (ICS). Nema integracije s pojedinim kalendarima; koristi se adresa za pretplatu koju svi podržavaju.
-- **Moj kalendar**: izbor više zajednica i pojedinačno dodanih događaja u jedan kalendar i jednu pretplatu, bez korisničkog računa (izbor se pamti na uređaju).
+- **Moj kalendar** (račun putem Googlea): praćene zajednice i pojedinačno dodani događaji u jednom kalendaru, na svim uređajima, s tajnom osobnom pretplatom (ICS). Gost koji klikne „Dodaj u Moj kalendar” ili „Zaprati zajednicu” dobiva poziv na prijavu, a nakon prijave radnja je već izvršena.
+
+## Računi
+
+Tri vrste: **korisnik** (Moj kalendar), **organizacija** (upravlja svojom zajednicom na `/organizacija`) i **administrator** (`/admin`). Prijava je putem Googlea (OpenID Connect s PKCE-om, provjera potpisa tokena), uloge se provjeravaju u bazi pri svakoj radnji. Postavljanje: [DEPLOY.md](DEPLOY.md), korak 7.
+
+## Sigurnost objave
+
+- Automatski se objavljuje samo mail čija je domena dokazana (DMARC); pala provjera se odbija, a mail bez dokaza čeka ručnu odluku.
+- Po zajednici: blaža provjera (SPF + DKIM) za domene bez DMARC-a i način „samo dopuštene adrese”.
+- Povratna poruka objavitelju: objavljeno (s popisom i poveznicom na zajednicu), nije pronađen datum, ili čeka potvrdu.
+- Ograničenja učestalosti u bazi, dnevnik radnji, istek poveznica za potvrdu (30 dana), stroga sigurnosna zaglavlja (CSP, HSTS), RLS na svim tablicama.
 
 ## Konektor za stranice organizacija
 
@@ -78,10 +89,11 @@ pnpm test          # logika: vrijeme, svrstavanje pošiljatelja, prosljeđivanje
 pnpm test:e2e      # preglednik: sve funkcije kao što ih vidi korisnik, na računalu i na mobitelu
 pnpm smoke https://tvoja-adresa   # objavljena stranica: radi li sve i koliko brzo (samo čita)
 pnpm test:all      # lint + tipovi + test + test:e2e
+pnpm tocnost       # točnost čitanja mailova na 27 primjera (vidi tocnost/README.md)
 ```
 
 - **`pnpm test:e2e`** sam izgradi i pokrene aplikaciju s praznom ugrađenom bazom i bez AI-ja, pa ne dira pravu bazu, ne šalje mailove i ništa ne naplaćuje (i kad postoji `.env.local`). Prvi put treba preglednik: `pnpm exec playwright install chromium`. Izvještaj s koracima i snimkama grešaka: `pnpm exec playwright show-report`.
-- Pokriva: mail nepoznate organizacije → zahtjev → potvrda → objava; sljedeći mail bez potvrde; duplikate; odbijanje pošiljatelja; sakrivanje objave; filtre i mjesec; opis događaja i poveznice za kalendare; Moj kalendar; ICS; widget na tuđoj stranici (automatska visina, postavke); JSON API; sigurnosna zaglavlja; izgled bez vodoravnog klizača.
+- Pokriva: mail nepoznate organizacije → zahtjev → potvrda → objava; sljedeći mail bez potvrde; duplikate; odbijanje pošiljatelja; sakrivanje objave; filtre i mjesec; opis događaja i poveznice za kalendare; računi i uloge (prijava putem lažnog Googlea, samo u testovima), poziv gostu na prijavu, lažirani pošiljatelj i ručna odluka, krivotvoreni kolačić i preusmjeravanje; Moj kalendar; ICS; widget na tuđoj stranici (automatska visina, postavke); JSON API; sigurnosna zaglavlja; izgled bez vodoravnog klizača.
 - Testovi cijelog toka u `tests/pipeline.test.ts` rade nad pravom Postgres shemom u memoriji, s lažnim AI odgovorom.
 
 Stanje i plan: [ROADMAP.md](ROADMAP.md).

@@ -6,10 +6,12 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { requireAdmin } from "@/lib/auth";
 import { adminEmail, forwarderEmails, inboundAddress } from "@/lib/config";
 import { extractorMode, llmProvider, PROVIDER_LABEL } from "@/lib/extract";
-import { listCommunities, listRecentItems, listRecentMessages, listRequests, listRules, relatedCommunities } from "@/lib/queries";
+import { listCommunities, listHeldMessages, listManagers, listRecentItems, listRecentMessages, listRequests, listRules, relatedCommunities } from "@/lib/queries";
 import { canSendEmail } from "@/lib/resend";
 import { dateKey, formatDateShort, timeKey } from "@/lib/time";
-import { logoutAction, reprocessAction, saveCommunityAction, testMailAction, toggleItemAction } from "./actions";
+import { toggleItemAction } from "@/app/community-actions";
+import { CommunitySettings } from "@/components/CommunitySettings";
+import { logoutAction, reprocessAction, testMailAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Administracija", robots: { index: false } };
@@ -20,7 +22,8 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   published: { label: "objavljeno", cls: "tag tag--ok" },
   no_items: { label: "bez događaja i rokova", cls: "tag" },
   rejected: { label: "pošiljatelj odbijen", cls: "tag tag--bad" },
-  unauthenticated: { label: "pošiljatelj nije potvrđen", cls: "tag tag--bad" },
+  unauthenticated: { label: "provjera pošiljatelja nije prošla", cls: "tag tag--bad" },
+  held: { label: "čeka ručnu odluku", cls: "tag tag--wait" },
   failed: { label: "greška pri obradi", cls: "tag tag--bad" },
 };
 
@@ -30,7 +33,14 @@ const FLASH: Record<string, { text: string; ok: boolean }> = {
   "vec-rijeseno": { text: "Taj je zahtjev već riješen.", ok: true },
   obradeno: { text: "Poruka je ponovno obrađena.", ok: true },
   "obrada-greska": { text: "Obrada ponovno nije uspjela. Pogledaj grešku uz poruku.", ok: false },
-  spremljeno: { text: "Zajednica je spremljena.", ok: true },
+  spremljeno: { text: "Spremljeno.", ok: true },
+  objavljeno: { text: "Mail je objavljen.", ok: true },
+  "bez-stavki": { text: "Mail je obrađen, ali u njemu nije pronađen datum događaja ni rok.", ok: false },
+  odbaceno: { text: "Mail je odbačen.", ok: true },
+  "adresa-neispravna": { text: "Adresa nije ispravna.", ok: false },
+  "adresa-zauzeta": { text: "Ta adresa već pripada nekoj zajednici.", ok: false },
+  "nema-ovlasti": { text: "Za tu radnju trebaš ovlasti administratora.", ok: false },
+  "test-held": { text: "Testni mail čeka ručnu odluku u postavkama zajednice.", ok: true },
   "test-nepotpun": { text: "Za testni mail trebaju adresa pošiljatelja i tekst.", ok: false },
   "test-published": { text: "Testni mail je obrađen i objavljen.", ok: true },
   "test-pending_community": { text: "Testni mail je od novog pošiljatelja: potvrdi zajednicu u zahtjevima.", ok: true },
@@ -42,12 +52,14 @@ const FLASH: Record<string, { text: string; ok: boolean }> = {
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ poruka?: string; n?: string }> }) {
   await requireAdmin();
   const sp = await searchParams;
-  const [requests, communities, rules, messages, items] = await Promise.all([
+  const [requests, communities, rules, messages, items, held, managers] = await Promise.all([
     listRequests("pending"),
     listCommunities(),
     listRules(),
     listRecentMessages(30),
     listRecentItems(40),
+    listHeldMessages(),
+    listManagers(),
   ]);
   const related = await Promise.all(requests.map((r) => relatedCommunities(r)));
   const flash = sp.poruka ? FLASH[sp.poruka] : null;
@@ -118,30 +130,23 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       ) : (
         <div className="admin__grid">
           {communities.map((c) => (
-            <details key={c.id} className="paper paper--pad">
+            <details key={c.id} className="paper paper--pad" open={held.some((h) => h.communityId === c.id)}>
               <summary style={{ cursor: "pointer" }}>
                 <b>{c.name}</b>{" "}
                 <span className="muted small">
                   /z/{c.slug} · {rules.filter((r) => r.communityId === c.id).map((r) => r.value).join(", ") || "bez pravila"}
                 </span>
               </summary>
-              <form action={saveCommunityAction} style={{ marginTop: 12 }}>
-                <input type="hidden" name="communityId" value={c.id} />
-                <div className="field">
-                  <label htmlFor={`cn-${c.id}`}>Ime</label>
-                  <input id={`cn-${c.id}`} name="name" defaultValue={c.name} maxLength={80} required />
-                </div>
-                <div className="field">
-                  <label htmlFor={`cd-${c.id}`}>Kratak opis</label>
-                  <input id={`cd-${c.id}`} name="description" defaultValue={c.description} maxLength={400} />
-                </div>
-                <button className="btn btn--small" type="submit">
-                  Spremi
-                </button>{" "}
-                <Link className="btn btn--quiet btn--small" href={`/z/${c.slug}`}>
-                  Otvori
-                </Link>
-              </form>
+              <div style={{ marginTop: 12 }}>
+                <CommunitySettings
+                  community={c}
+                  rules={rules.filter((r) => r.communityId === c.id)}
+                  held={held.filter((h) => h.communityId === c.id)}
+                  managers={managers.filter((m) => m.communityId === c.id)}
+                  admin
+                  from="admin"
+                />
+              </div>
             </details>
           ))}
         </div>
@@ -232,6 +237,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 <td>{i.communityName}</td>
                 <td>
                   <form action={toggleItemAction} className="inline">
+                    <input type="hidden" name="povratak" value="admin" />
                     <input type="hidden" name="itemId" value={i.id} />
                     <button className="btn btn--quiet btn--small" type="submit">
                       {i.status === "published" ? "Sakrij" : "Prikaži"}

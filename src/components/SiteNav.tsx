@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LinkHint } from "./LinkHint";
-import { IconBookmark, IconList, IconSend } from "./icons";
+import { IconBookmark, IconList, IconSend, IconUser } from "./icons";
+import { useMe } from "./me";
 
 const LINKS = [
   { href: "/", label: "Sve", match: (p: string) => p === "/" || p.startsWith("/z/") || p.startsWith("/d/"), icon: <IconList /> },
@@ -13,6 +14,7 @@ const LINKS = [
 
 export function SiteNav() {
   const pathname = usePathname() ?? "/";
+  const me = useMe();
   return (
     <nav className="nav" aria-label="Glavna navigacija">
       {LINKS.map((l) => (
@@ -22,6 +24,19 @@ export function SiteNav() {
           <LinkHint />
         </Link>
       ))}
+      {me.user ? (
+        <Link href="/racun" aria-current={pathname.startsWith("/racun") || pathname.startsWith("/organizacija") ? "page" : undefined}>
+          <IconUser />
+          {me.user.name.split(" ")[0] || "Račun"}
+          <LinkHint />
+        </Link>
+      ) : (
+        <Link href="/prijava" prefetch={false} aria-current={pathname.startsWith("/prijava") ? "page" : undefined}>
+          <IconUser />
+          Prijava
+          <LinkHint />
+        </Link>
+      )}
     </nav>
   );
 }

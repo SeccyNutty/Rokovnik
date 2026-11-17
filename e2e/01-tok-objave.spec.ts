@@ -117,7 +117,7 @@ test("odbijen pošiljatelj: njegovi se mailovi više ne obrađuju", async ({ req
 
 test("testni mail iz administracije prolazi istu obradu", async ({ page }) => {
   await loginAdmin(page);
-  await page.getByLabel("Pošiljatelj").fill(`Referada <referada@${ORG.domain}>`);
+  await page.getByLabel("Pošiljatelj", { exact: true }).fill(`Referada <referada@${ORG.domain}>`);
   await page.getByLabel("Naslov").fill("Smotra fakulteta");
   await page.getByLabel("Tekst maila").fill(`Smotra fakulteta odrzat ce se ${future(30).hr} u 10:00 u auli.`);
   await page.getByRole("button", { name: "Pošalji testni mail" }).click();

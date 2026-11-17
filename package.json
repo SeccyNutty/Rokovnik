@@ -12,6 +12,7 @@
     "test:e2e": "playwright test",
     "test:all": "pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e",
     "smoke": "tsx scripts/smoke.ts",
+    "tocnost": "tsx --env-file-if-exists=.env.local scripts/tocnost.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=.env.local scripts/migrate.ts",
     "db:seed": "tsx --env-file-if-exists=.env.local scripts/seed.ts",

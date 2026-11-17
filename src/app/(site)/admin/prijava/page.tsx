@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
 import { adminPassword, isProd } from "@/lib/config";
+import { googleConfigured } from "@/lib/google";
 import { loginAction } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,16 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       </div>
       {greska === "lozinka" ? <div className="flash flash--err">Lozinka nije točna.</div> : null}
       {greska === "previse" ? <div className="flash flash--err">Previše pokušaja. Pokušaj ponovno za 10 minuta.</div> : null}
-      {!configured ? <div className="flash flash--err">Lozinka nije postavljena. Postavi varijablu ADMIN_PASSWORD.</div> : null}
+      {googleConfigured() ? (
+        <div className="paper paper--pad" style={{ marginBottom: 14 }}>
+          <p style={{ marginTop: 0 }}>Administratori se prijavljuju svojim Google računom.</p>
+          <a className="btn btn--block btn--google" href="/api/auth/google?next=/admin">
+            Prijavi se putem Googlea
+          </a>
+        </div>
+      ) : null}
+      {!configured && !googleConfigured() ? <div className="flash flash--err">Prijava nije postavljena. Postavi Google prijavu ili varijablu ADMIN_PASSWORD.</div> : null}
+      {configured ? (
       <form action={loginAction} className="paper paper--pad">
         <div className="field">
           <label htmlFor="lozinka">Lozinka</label>
@@ -29,6 +39,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           Prijavi se
         </button>
       </form>
+      ) : null}
     </div>
   );
 }

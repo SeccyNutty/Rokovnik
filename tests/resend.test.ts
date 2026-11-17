@@ -25,7 +25,7 @@ describe("potpisi", () => {
     const id = "11111111-1111-4111-8111-111111111111";
     expect(verifyRequestToken(requestToken(id))).toBe(id);
     expect(verifyRequestToken(requestToken(id).replace(/.$/, "x"))).toBeNull();
-    expect(verifyRequestToken("22222222-2222-4222-8222-222222222222." + requestToken(id).split(".")[1])).toBeNull();
+    expect(verifyRequestToken("22222222-2222-4222-8222-222222222222." + requestToken(id).split(".").slice(1).join("."))).toBeNull();
   });
   it("sesija administratora istječe", () => {
     const v = createSessionValue(now);

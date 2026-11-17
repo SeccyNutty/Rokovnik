@@ -18,6 +18,12 @@ export function RequestForm(props: {
         Prvi mail: {r.sampleFrom}
         {r.sampleSubject ? ` · „${r.sampleSubject}”` : ""}
       </div>
+      {!r.verified ? (
+        <p className="detail__unsure" style={{ marginTop: 10 }}>
+          <b>Pošiljatelj nije dokazan.</b> Mail nije prošao DMARC provjeru, pa adresa može biti lažirana. Potvrdi samo ako očekuješ mail od te organizacije.
+          Budući mailovi bez dokaza neće se objavljivati sami, nego će čekati ručnu odluku.
+        </p>
+      ) : null}
       {props.related?.length ? (
         <p className="detail__unsure" style={{ marginTop: 10 }}>
           Slična domena već ima zajednicu: {props.related.map((r) => `${r.domain} → ${r.name}`).join(", ")}. Ako je ovo ista organizacija, odaberi

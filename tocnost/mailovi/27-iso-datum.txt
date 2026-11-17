@@ -1,0 +1,4 @@
+Od: Institut za istraživanje <seminar@institut.example>
+Naslov: Seminar: Metoda konačnih elemenata u praksi
+
+Seminar „Metoda konačnih elemenata u praksi” održat će se 2026-12-16, od 9.30 do 12 h, u seminarskoj sobi Instituta (Lučićeva 5).

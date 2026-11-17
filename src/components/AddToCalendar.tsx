@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import type { AddLinks } from "@/lib/calendar-links";
-import { parseSaved, SAVED_COOKIE, serializeSaved } from "@/lib/saved";
+import { toggleSavedAction } from "@/app/account-actions";
 import { IconCalendarPlus } from "./icons";
+import { LoginPrompt } from "./LoginPrompt";
+import { setSavedLocal, useMe } from "./me";
 
 type External = keyof AddLinks;
 type Choice = External | "rokovnik";
@@ -30,20 +32,6 @@ function readChoice(): Choice | null {
   }
 }
 
-/** Sirova vrijednost kolačića sa spremljenim stavkama (tekst, da usporedba ostane stabilna). */
-function readSavedRaw(): string {
-  const hit = document.cookie.split("; ").find((c) => c.startsWith(`${SAVED_COOKIE}=`));
-  return hit ? hit.slice(SAVED_COOKIE.length + 1) : "";
-}
-
-function writeSaved(ids: string[]) {
-  const secure = window.location.protocol === "https:" ? "; Secure" : "";
-  document.cookie = ids.length
-    ? `${SAVED_COOKIE}=${serializeSaved(ids)}; Path=/; Max-Age=${400 * 24 * 3600}; SameSite=Lax${secure}`
-    : `${SAVED_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax${secure}`;
-  window.dispatchEvent(new Event(CHANGE_EVENT));
-}
-
 function subscribe(onChange: () => void): () => void {
   window.addEventListener("storage", onChange);
   window.addEventListener(CHANGE_EVENT, onChange);
@@ -54,17 +42,18 @@ function subscribe(onChange: () => void): () => void {
 }
 
 /**
- * "Dodaj u moj kalendar" za jedan događaj: u Moj kalendar u Rokovniku (pamti se na uređaju,
- * bez prijave) ili u vlastitu kalendarsku aplikaciju. Prvi put se bira odredište (dva klika),
+ * "Dodaj u moj kalendar" za jedan događaj: u Moj kalendar u Rokovniku (traži račun; gost
+ * dobiva poziv na prijavu putem Googlea) ili u vlastitu kalendarsku aplikaciju (bez računa). Prvi put se bira odredište (dva klika),
  * izbor se pamti pa je svako sljedeće dodavanje jedan klik.
  */
 export function AddToCalendar({ links, itemId }: { links: AddLinks; itemId: string }) {
   const router = useRouter();
-  // Zapamćeni izbor i spremljene stavke čitaju se s uređaja; na poslužitelju ih nema.
+  // Zapamćeni izbor aplikacije čita se s uređaja; spremljene stavke pripadaju računu.
   const choice = useSyncExternalStore(subscribe, readChoice, () => null);
-  const savedRaw = useSyncExternalStore(subscribe, readSavedRaw, () => "");
+  const me = useMe();
   const [open, setOpen] = useState(false);
-  const saved = parseSaved(savedRaw).includes(itemId.toLowerCase());
+  const [ask, setAsk] = useState(false);
+  const saved = me.spremljeno.includes(itemId.toLowerCase());
 
   const remember = (key: Choice) => {
     try {
@@ -76,12 +65,17 @@ export function AddToCalendar({ links, itemId }: { links: AddLinks; itemId: stri
     setOpen(false);
   };
   const toggleSaved = () => {
+    if (!me.user) return setAsk(true);
     const id = itemId.toLowerCase();
-    const rest = parseSaved(readSavedRaw()).filter((x) => x !== id);
-    writeSaved(saved ? rest : [...rest, id]);
-    if (!saved) remember("rokovnik");
-    // Na stranici "Moj kalendar" popis se slaže na poslužitelju, pa ga treba osvježiti.
-    router.refresh();
+    const next = !saved;
+    setSavedLocal(id, next);
+    if (next) remember("rokovnik");
+    void toggleSavedAction(id, next).then((res) => {
+      if (!res.ok || res.on !== next) setSavedLocal(id, !next);
+      if (!res.ok && res.reason === "login") setAsk(true);
+      // Na stranici "Moj kalendar" popis se slaže na poslužitelju, pa ga treba osvježiti.
+      router.refresh();
+    });
   };
   const linkProps = (key: External) =>
     key === "ics" ? { href: links.ics } : { href: links[key], target: "_blank", rel: "noopener noreferrer" };
@@ -128,11 +122,18 @@ export function AddToCalendar({ links, itemId }: { links: AddLinks; itemId: stri
       ) : null}
       {saved ? (
         <p className="addcal__hint">
-          Spremljeno na ovom uređaju. <Link href="/moj">Otvori Moj kalendar</Link>
+          Spremljeno u tvoj račun. <Link href="/moj">Otvori Moj kalendar</Link>
         </p>
       ) : open ? (
-        <p className="addcal__hint">Moj kalendar je ovdje u Rokovniku, bez prijave. Ostalo otvara tvoju kalendarsku aplikaciju.</p>
+        <p className="addcal__hint">Moj kalendar je ovdje u Rokovniku i traži prijavu. Ostalo otvara tvoju kalendarsku aplikaciju, bez računa.</p>
       ) : null}
+      <LoginPrompt
+        open={ask}
+        onClose={() => setAsk(false)}
+        title="Za Moj kalendar trebaš račun"
+        text="Prijavi se i ovaj događaj se sprema u tvoj Moj kalendar. Dostupan je na svim tvojim uređajima."
+        action={`spremi:${itemId.toLowerCase()}`}
+      />
     </div>
   );
 }

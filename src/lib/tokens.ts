@@ -13,18 +13,19 @@ export function safeEqual(a: string, b: string): boolean {
   return x.length === y.length && timingSafeEqual(x, y);
 }
 
-/** Token u poveznici "Potvrdi zajednicu" iz maila administratoru. */
-export function requestToken(requestId: string): string {
-  return `${requestId}.${sign(`request:${requestId}`)}`;
+const REQUEST_TOKEN_DAYS = 30;
+
+/** Token u poveznici "Potvrdi zajednicu" iz maila administratoru. Vrijedi 30 dana. */
+export function requestToken(requestId: string, now = Date.now()): string {
+  const exp = now + REQUEST_TOKEN_DAYS * 24 * 3600_000;
+  return `${requestId}.${exp}.${sign(`request:${requestId}:${exp}`)}`;
 }
 
-export function verifyRequestToken(token: string): string | null {
-  const dot = token.lastIndexOf(".");
-  if (dot <= 0) return null;
-  const id = token.slice(0, dot);
-  const sig = token.slice(dot + 1);
-  if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
-  return safeEqual(sig, sign(`request:${id}`)) ? id : null;
+export function verifyRequestToken(token: string, now = Date.now()): string | null {
+  const [id, exp, sig] = token.split(".");
+  if (!id || !exp || !sig || !/^[0-9a-f-]{36}$/i.test(id) || !/^\d+$/.test(exp)) return null;
+  if (Number(exp) < now) return null;
+  return safeEqual(sig, sign(`request:${id}:${exp}`)) ? id : null;
 }
 
 const SESSION_DAYS = 14;

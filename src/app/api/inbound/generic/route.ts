@@ -15,6 +15,8 @@ const Body = z.object({
   html: z.string().max(500_000).nullish(),
   date: z.string().nullish(),
   auth: z.object({ spf: z.string().optional(), dkim: z.string().optional(), dmarc: z.string().optional() }).nullish(),
+  /** Automatski ili skupno poslan mail (npr. test točnosti): pošiljatelju se ne šalje povratna poruka. */
+  automated: z.boolean().optional(),
 });
 
 /**
@@ -50,6 +52,7 @@ export async function POST(request: Request) {
       html: b.html,
       receivedAt: Number.isNaN(when.getTime()) ? new Date() : when,
       auth: b.auth ?? null,
+      automated: b.automated ?? false,
     },
     { baseUrl: baseUrlFromRequest(request) },
   );

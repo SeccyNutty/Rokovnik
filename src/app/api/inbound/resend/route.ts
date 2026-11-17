@@ -5,6 +5,16 @@ import { getReceivedEmail, verifySvixSignature } from "@/lib/resend";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+/** Automatski odgovori i masovne liste: njima ne šaljemo povratnu poruku (izbjegavanje petlji). */
+function isAutomated(headers: Record<string, string> | null | undefined): boolean {
+  if (!headers) return false;
+  const h: Record<string, string> = {};
+  for (const [k, v] of Object.entries(headers)) h[k.toLowerCase()] = String(v).toLowerCase();
+  if (h["auto-submitted"] && h["auto-submitted"] !== "no") return true;
+  if (/bulk|list|junk/.test(h["precedence"] ?? "")) return true;
+  return Boolean(h["list-id"] || h["list-unsubscribe"] || h["x-autoreply"] || h["x-autorespond"]);
+}
+
 /**
  * Webhook za Resend (događaj email.received). Resend šalje samo metapodatke,
  * pa tijelo maila dohvaćamo preko API-ja i predajemo zajedničkoj obradi.
@@ -45,6 +55,7 @@ export async function POST(request: Request) {
         receivedAt: new Date(email.created_at),
         auth: email.authentication ?? null,
         hasAttachments: (email.attachments?.length ?? 0) > 0,
+        automated: isAutomated(email.headers),
       },
       { baseUrl: baseUrlFromRequest(request) },
     );

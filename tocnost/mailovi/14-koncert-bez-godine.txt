@@ -1,0 +1,6 @@
+Od: Akademski zbor <zbor@example.hr>
+Naslov: Božićni koncert
+
+Akademski zbor poziva vas na tradicionalni Božićni koncert 20. prosinca u 19 sati u crkvi sv. Marka.
+
+Ulaz je slobodan.

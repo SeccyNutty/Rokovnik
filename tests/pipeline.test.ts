@@ -4,11 +4,15 @@ import { resetDbForTests, type Db } from "@/db";
 import { communities, communityRequests, items, messages, senderRules } from "@/db/schema";
 import { extractWithRules } from "@/lib/extract/heuristic";
 import type { Extractor } from "@/lib/extract/types";
-import { approveRequest, ingestEmail, processMessage, rejectRequest, senderAuthOk, type InboundEmail, type PipelineDeps } from "@/lib/pipeline";
+import type { FeedbackInput } from "@/lib/feedback";
+import { buildFeedback } from "@/lib/feedback";
+import { approveRequest, discardMessage, ingestEmail, processMessage, rejectRequest, releaseMessage, type InboundEmail, type PipelineDeps } from "@/lib/pipeline";
+import { senderVerdict } from "@/lib/sender-auth";
 import { dateKey, timeKey } from "@/lib/time";
 
 let db: Db;
 let notified: string[];
+let feedback: FeedbackInput[];
 let n = 0;
 
 const lecture: Extractor = async () => ({
@@ -31,6 +35,7 @@ function deps(extra: Partial<PipelineDeps> = {}): PipelineDeps {
   return {
     extract: lecture,
     notifyAdmin: async (r) => void notified.push(r.value),
+    feedback: async (f) => void feedback.push(f),
     baseUrl: "https://rokovnik.example",
     forwarders: ["hrvoje@gmail.com"],
     ...extra,
@@ -46,6 +51,7 @@ function mail(over: Partial<InboundEmail> = {}): InboundEmail {
     subject: "Gostujuće predavanje",
     text: "Predavanje će se održati 15. 12. 2026. u 14:15 u dvorani A.",
     receivedAt: new Date("2026-11-16T09:00:00Z"),
+    auth: { spf: "pass", dkim: "pass", dmarc: "pass" },
     ...over,
   };
 }
@@ -53,6 +59,7 @@ function mail(over: Partial<InboundEmail> = {}): InboundEmail {
 beforeEach(async () => {
   db = await resetDbForTests();
   notified = [];
+  feedback = [];
 });
 
 describe("dolazni mail", () => {
@@ -157,10 +164,14 @@ describe("dolazni mail", () => {
     const spoof = await ingestEmail(mail({ auth: { spf: "fail", dkim: "fail", dmarc: "fail" } }), deps());
     expect(spoof.status).toBe("unauthenticated");
     expect((await db.select().from(items)).length).toBe(before);
-    expect(senderAuthOk({ spf: "pass", dkim: "pass", dmarc: "pass" })).toBe(true);
-    expect(senderAuthOk({ spf: "pass", dkim: "fail", dmarc: "unknown" })).toBe(true);
-    expect(senderAuthOk({ spf: "fail", dkim: "fail", dmarc: "unknown" })).toBe(false);
-    expect(senderAuthOk(null)).toBe(true);
+    expect(senderVerdict({ spf: "pass", dkim: "pass", dmarc: "pass" })).toBe("trusted");
+    expect(senderVerdict({ spf: "fail", dkim: "fail", dmarc: "unknown" })).toBe("rejected");
+    expect(senderVerdict({ spf: "pass", dkim: "pass", dmarc: "fail" })).toBe("rejected");
+    // Bez DMARC-a domena iz polja From nije dokazana, makar SPF i DKIM prošli.
+    expect(senderVerdict({ spf: "pass", dkim: "pass", dmarc: "unknown" })).toBe("unverified");
+    expect(senderVerdict({ spf: "pass", dkim: "pass", dmarc: "gray" }, "relaxed")).toBe("trusted");
+    expect(senderVerdict({ spf: "pass", dkim: "fail", dmarc: "unknown" }, "relaxed")).toBe("unverified");
+    expect(senderVerdict(null)).toBe("unverified");
   });
 
   it("potvrda može vezati pošiljatelja uz postojeću zajednicu", async () => {
@@ -228,17 +239,6 @@ describe("Moj kalendar: pojedinačno spremljene stavke", () => {
     const withCommunity = await listItems({ communityIds: [event.communityId], itemIds: [event.id] });
     expect(withCommunity).toHaveLength(all.length);
   });
-
-  it("popis iz kolačića prihvaća samo ispravne oznake, bez ponavljanja", async () => {
-    const { parseSaved, serializeSaved, SAVED_MAX } = await import("@/lib/saved");
-    const a = "11111111-1111-4111-8111-111111111111";
-    const b = "22222222-2222-4222-8222-222222222222";
-    expect(parseSaved(`${a}.${b}.${a}.nesto'; drop table--`)).toEqual([a, b]);
-    expect(parseSaved(undefined)).toEqual([]);
-    expect(parseSaved(serializeSaved([a, b]))).toEqual([a, b]);
-    const many = Array.from({ length: SAVED_MAX + 5 }, (_, i) => `${String(i).padStart(8, "0")}-1111-4111-8111-111111111111`);
-    expect(parseSaved(many.join("."))).toHaveLength(SAVED_MAX);
-  });
 });
 
 describe("potvrda s naknadnom obradom", () => {
@@ -255,5 +255,88 @@ describe("potvrda s naknadnom obradom", () => {
     expect(await db.select().from(items)).toHaveLength(2);
     const [done] = await db.select().from(messages);
     expect(done.status).toBe("published");
+  });
+});
+
+
+describe("zaštita od lažnih pošiljatelja", () => {
+  const unproven = { spf: "pass", dkim: "pass", dmarc: "unknown" };
+
+  it("mail bez dokaza domene u postojećoj zajednici čeka ručnu odluku i ne objavljuje se", async () => {
+    const first = await ingestEmail(mail(), deps());
+    await approveRequest(first.requestId!, {}, deps());
+    const before = (await db.select().from(items)).length;
+
+    const spoofed = await ingestEmail(mail({ subject: "Lažna obavijest", auth: unproven }), deps());
+    expect(spoofed.status).toBe("held");
+    expect(await db.select().from(items)).toHaveLength(before);
+    const none = await ingestEmail(mail({ subject: "Bez ikakvih podataka", auth: null }), deps());
+    expect(none.status).toBe("held");
+
+    // Ručna objava i odbacivanje.
+    expect((await releaseMessage(spoofed.messageId, deps()))?.status).toBe("published");
+    expect(await discardMessage(none.messageId)).toBe(true);
+    expect(await releaseMessage(none.messageId, deps())).toBeNull();
+  });
+
+  it("zahtjev nedokazanog pošiljatelja nosi upozorenje", async () => {
+    const r = await ingestEmail(mail({ auth: unproven }), deps());
+    expect(r.status).toBe("pending_community");
+    const [request] = await db.select().from(communityRequests);
+    expect(request.verified).toBe(false);
+    expect(feedback).toHaveLength(0);
+  });
+
+  it("blaža provjera se uključuje po zajednici i prihvaća SPF + DKIM", async () => {
+    const first = await ingestEmail(mail(), deps());
+    const approved = await approveRequest(first.requestId!, {}, deps());
+    await db.update(communities).set({ authMode: "relaxed" }).where(eq(communities.id, approved!.community.id));
+    const r = await ingestEmail(mail({ subject: "Drugo predavanje", auth: unproven }), deps());
+    expect(r.status).toBe("published");
+  });
+
+  it("način 'samo dopuštene adrese' zadržava mail s druge adrese iste domene", async () => {
+    const first = await ingestEmail(mail(), deps());
+    const approved = await approveRequest(first.requestId!, {}, deps());
+    const id = approved!.community.id;
+    await db.update(communities).set({ senderMode: "addresses" }).where(eq(communities.id, id));
+    await db.insert(senderRules).values({ communityId: id, kind: "address", value: "referada@fsb.unizg.hr" });
+
+    expect((await ingestEmail(mail({ from: "student@fsb.unizg.hr", subject: "Tulum" }), deps())).status).toBe("held");
+    expect((await ingestEmail(mail({ from: "Referada <referada@fsb.unizg.hr>", subject: "Upisi" }), deps())).status).toBe("published");
+  });
+
+  it("jedan pošiljatelj ne može zatrpati sustav", async () => {
+    const first = await ingestEmail(mail(), deps());
+    await approveRequest(first.requestId!, {}, deps());
+    let last = "";
+    for (let i = 0; i < 61; i++) last = (await ingestEmail(mail({ subject: `Obavijest ${i}` }), deps())).status;
+    expect(last).toBe("rejected");
+  });
+});
+
+describe("povratna poruka objavitelju", () => {
+  it("nakon objave pošiljatelj dobiva popis objavljenog i poveznicu na zajednicu", async () => {
+    const first = await ingestEmail(mail(), deps());
+    expect(feedback.map((f) => f.status)).toEqual(["pending_community"]);
+    await approveRequest(first.requestId!, {}, deps());
+    expect(feedback.map((f) => f.status)).toEqual(["pending_community", "published"]);
+
+    const text = buildFeedback(feedback[1])!;
+    expect(text.subject).toContain("Objavljeno u zajednici FSB");
+    expect(text.text).toContain("https://rokovnik.example/z/fsb");
+    expect(text.text).toContain("Gostujuće predavanje: Suradnička robotika");
+    expect(text.text).toContain("ROK: Prijava na predavanje");
+  });
+
+  it("mail bez datuma: poruka objašnjava što nedostaje; ponovna obrada ne šalje novu poruku", async () => {
+    const first = await ingestEmail(mail(), deps());
+    await approveRequest(first.requestId!, {}, deps());
+    feedback = [];
+    const empty = await ingestEmail(mail({ subject: "Pozdrav" }), deps({ extract: async () => ({ extractor: "ai", items: [] }) }));
+    expect(feedback.map((f) => f.status)).toEqual(["no_items"]);
+    expect(buildFeedback(feedback[0])!.text).toContain("nismo pronašli datum");
+    await processMessage(empty.messageId, deps());
+    expect(feedback).toHaveLength(1);
   });
 });
