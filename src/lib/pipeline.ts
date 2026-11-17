@@ -1,6 +1,7 @@
 import { and, eq, or, sql } from "drizzle-orm";
 import { getDb, type Db } from "@/db";
 import { communities, communityRequests, items, messages, senderRules, type Community, type CommunityRequest, type Message, type NewItem } from "@/db/schema";
+import { touchData } from "./cache";
 import { adminEmail, APP_NAME, configuredBaseUrl, forwarderEmails } from "./config";
 import { extractItems, llmProvider, type ExtractedItem, type Extractor } from "./extract";
 import { canSendEmail, loadReceivedAttachments, sendEmail } from "./resend";
@@ -336,6 +337,7 @@ export async function processMessage(messageId: string, deps: PipelineDeps = {})
     }
     const status: Message["status"] = itemIds.length ? "published" : "no_items";
     await db.update(messages).set({ status, extractor: result.extractor, processedAt: new Date(), error: null }).where(eq(messages.id, messageId));
+    await touchData();
     return { status, itemIds };
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e);
@@ -401,6 +403,8 @@ export async function approveRequest(
     .set({ communityId: community.id, status: "processing" })
     .where(and(eq(messages.requestId, requestId), eq(messages.status, "pending_community")))
     .returning({ id: messages.id });
+
+  await touchData();
 
   if (input.defer && waiting.length) {
     input.defer(async () => {

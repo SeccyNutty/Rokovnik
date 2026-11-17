@@ -43,3 +43,7 @@ next-env.d.ts
 
 # lokalna baza (PGlite) i privremene datoteke
 .data/
+
+# Playwright
+/test-results/
+/playwright-report/

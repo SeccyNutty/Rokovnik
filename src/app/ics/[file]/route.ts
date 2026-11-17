@@ -1,6 +1,7 @@
 import { baseUrlFromRequest } from "@/lib/base-url";
 import { APP_NAME } from "@/lib/config";
 import { buildCalendar, icsResponse } from "@/lib/ics";
+import { startOfToday } from "@/lib/time";
 import { parseSaved } from "@/lib/saved";
 import { getCommunitiesBySlugs, getCommunityBySlug, listItems, toIcs } from "@/lib/queries";
 
@@ -40,7 +41,7 @@ export async function GET(request: Request, ctx: { params: Promise<{ file: strin
   if (kind === "deadline") title += " (rokovi)";
 
   // Zadržavamo i nedavno prošle stavke da ne nestaju iz kalendara čim prođu.
-  const rows = await listItems({ communityIds, itemIds, kind, from: new Date(Date.now() - 30 * DAY), limit: 500 });
+  const rows = await listItems({ communityIds, itemIds, kind, from: new Date(startOfToday().getTime() - 30 * DAY), limit: 500 });
   const body = buildCalendar({ name: title, items: rows.map(toIcs), baseUrl: baseUrlFromRequest(request) });
   return icsResponse(body, file);
 }

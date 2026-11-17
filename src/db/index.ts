@@ -55,6 +55,11 @@ async function create(): Promise<Db> {
   return db as unknown as Db;
 }
 
+/** Koji pogon baze radi: pravi Postgres ili ugrađeni PGlite (razvoj i testovi). */
+export function dbDriver(): "postgres" | "pglite" {
+  return process.env.DATABASE_URL ? "postgres" : "pglite";
+}
+
 export function getDb(): Promise<Db> {
   const h = holder.__rokovnikDb!;
   h.promise ??= create().catch((e) => {

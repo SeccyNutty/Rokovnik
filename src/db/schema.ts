@@ -125,6 +125,8 @@ export const items = pgTable(
   (t) => [
     uniqueIndex("items_dedupe_uid").on(t.communityId, t.dedupeKey),
     index("items_starts_idx").on(t.startsAt),
+    // Kalendar jedne zajednice: nadolazeće stavke poredane po početku.
+    index("items_community_starts_idx").on(t.communityId, t.startsAt),
   ],
 );
 

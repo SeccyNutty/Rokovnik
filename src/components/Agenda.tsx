@@ -13,7 +13,14 @@ import { Sheet } from "./Sheet";
  * Popis po danima. Klik na stavku otvara opis, a na dnu opisa je
  * "Dodaj u moj kalendar".
  */
-export function Agenda(props: { items: ItemView[]; todayKey: string; showCommunity: boolean; empty: ReactNode }) {
+export function Agenda(props: {
+  items: ItemView[];
+  todayKey: string;
+  showCommunity: boolean;
+  empty: ReactNode;
+  /** Ugrađeni kalendar (widget): stavka se otvara kao stranica u novoj kartici umjesto prozora s opisom. */
+  external?: boolean;
+}) {
   const [openId, setOpenId] = useState<string | null>(null);
   const days = useMemo(() => {
     const map = new Map<string, ItemView[]>();
@@ -46,7 +53,7 @@ export function Agenda(props: { items: ItemView[]; todayKey: string; showCommuni
                     <button
                       type="button"
                       className={item.kind === "deadline" ? "entry entry--rok" : "entry"}
-                      onClick={() => setOpenId(item.id)}
+                      onClick={() => (props.external ? window.open(item.pageUrl, "_blank", "noopener") : setOpenId(item.id))}
                     >
                       <span className="entry__time">
                         {item.kind === "deadline" ? (

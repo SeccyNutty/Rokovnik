@@ -21,7 +21,6 @@ export default async function CommunityPage({ params, searchParams }: Props) {
   const [{ slug }, sp, origin] = await Promise.all([params, searchParams, baseUrl()]);
   const community = await getCommunityBySlug(slug);
   if (!community) notFound();
-  const embed = `<iframe src="${origin}/ugradi/${community.slug}" title="${community.name}: događaji i rokovi" style="width:100%;height:600px;border:0" loading="lazy"></iframe>`;
   const address = inboundAddress();
 
   return (
@@ -62,11 +61,9 @@ export default async function CommunityPage({ params, searchParams }: Props) {
             <b>Za organizatore.</b> Objava je običan mail{address ? <> na <b>{address}</b></> : null}: sustav sam pročita događaj i rokove.{" "}
             <Link href="/objavi">Kako to radi</Link>
           </p>
-          <details className="more">
-            <summary>Ugradi ovaj kalendar na svoju stranicu</summary>
-            <p style={{ margin: "6px 0 0" }}>Zalijepi ovaj kôd na mjesto gdje želiš kalendar:</p>
-            <pre className="code">{embed}</pre>
-          </details>
+          <p className="note" style={{ marginTop: 14 }}>
+            <Link href={`/z/${community.slug}/ugradi`}>Ugradi ovaj kalendar na svoju stranicu</Link>
+          </p>
         </div>
       </aside>
     </div>

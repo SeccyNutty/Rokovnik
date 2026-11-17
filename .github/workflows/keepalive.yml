@@ -1,0 +1,21 @@
+name: Keepalive
+
+# Svakih 10 minuta otvara objavljenu stranicu. Dvije koristi:
+#  - poslužiteljske funkcije ostaju "tople", pa posjetitelji rjeđe čekaju hladni start;
+#  - besplatna Supabase baza se ne pauzira zbog neaktivnosti (pauza nastupa nakon 7 dana).
+# Adresu postavi u GitHubu: Settings → Secrets and variables → Actions → Variables → SITE_URL.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    if: ${{ vars.SITE_URL != '' }}
+    steps:
+      - name: Health
+        run: curl -fsS --max-time 30 "${{ vars.SITE_URL }}/api/health"
+      - name: Naslovnica
+        run: curl -fsS --max-time 30 -o /dev/null -w "naslovnica %{http_code} %{time_total}s\n" "${{ vars.SITE_URL }}/"

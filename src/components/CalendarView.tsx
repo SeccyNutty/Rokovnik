@@ -5,6 +5,7 @@ import { listItems, listUpcoming, toView } from "@/lib/queries";
 import { addDays, dateKey, formatDateLong, isValidDateKey, MONTHS_NOMINATIVE, WEEKDAYS_SHORT, weekdayOfKey, zonedToUtc } from "@/lib/time";
 import { Agenda } from "./Agenda";
 import { IconNext, IconPrev } from "./icons";
+import { LinkHint } from "./LinkHint";
 
 export type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -33,6 +34,12 @@ export async function CalendarView(props: {
   itemIds?: string[];
   showCommunity: boolean;
   empty: ReactNode;
+  /** Najviše stavki u popisu (zadano 150). */
+  limit?: number;
+  /** Ugrađeni kalendar: stavke se otvaraju u novoj kartici. */
+  external?: boolean;
+  /** Sakrij filtre i izbor prikaza (ugrađeni kalendar s fiksnim postavkama). */
+  hideControls?: boolean;
 }) {
   const { basePath, params } = props;
   const vrsta = one(params.vrsta);
@@ -42,38 +49,43 @@ export async function CalendarView(props: {
   const todayKey = dateKey(now);
   const origin = await baseUrl();
 
-  const controls = (
+  const controls = props.hideControls ? null : (
     <div className="controls">
       <div className="chips" role="group" aria-label="Vrsta">
         <Link className="chip" href={hrefWith(basePath, params, { vrsta: null, dan: null })} aria-current={!kind ? "true" : undefined}>
           Sve
+          <LinkHint />
         </Link>
         <Link className="chip" href={hrefWith(basePath, params, { vrsta: "dogadaji", dan: null })} aria-current={kind === "event" ? "true" : undefined}>
           <span className="chip__dot" />
           Događaji
+          <LinkHint />
         </Link>
         <Link className="chip" href={hrefWith(basePath, params, { vrsta: "rokovi", dan: null })} aria-current={kind === "deadline" ? "true" : undefined}>
           <span className="chip__dot chip__dot--rok" />
           Rokovi
+          <LinkHint />
         </Link>
       </div>
       <div className="seg" role="group" aria-label="Prikaz">
         <Link href={hrefWith(basePath, params, { prikaz: null, m: null, dan: null })} aria-current={!month ? "true" : undefined}>
           Popis
+          <LinkHint />
         </Link>
         <Link href={hrefWith(basePath, params, { prikaz: "mjesec" })} aria-current={month ? "true" : undefined}>
           Mjesec
+          <LinkHint />
         </Link>
       </div>
     </div>
   );
 
   if (!month) {
-    const rows = await listUpcoming({ communityIds: props.communityIds, itemIds: props.itemIds, kind, limit: 150 }, now);
+    const rows = await listUpcoming({ communityIds: props.communityIds, itemIds: props.itemIds, kind, limit: props.limit ?? 150 }, now);
     return (
       <>
         {controls}
-        <Agenda items={rows.map((r) => toView(r, origin, now))} todayKey={todayKey} showCommunity={props.showCommunity} empty={props.empty} />
+        <Agenda items={rows.map((r) => toView(r, origin, now))} todayKey={todayKey} showCommunity={props.showCommunity} empty={props.empty} external={props.external} />
       </>
     );
   }
@@ -120,12 +132,14 @@ export async function CalendarView(props: {
             {MONTHS_NOMINATIVE[monthNo - 1]} {year}.
           </div>
           <div className="month__nav">
-            <Link href={hrefWith(basePath, params, { m: prevMonth, dan: null })} aria-label="Prethodni mjesec">
+            <Link prefetch={false} href={hrefWith(basePath, params, { m: prevMonth, dan: null })} aria-label="Prethodni mjesec">
               <IconPrev />
-            </Link>
-            <Link href={hrefWith(basePath, params, { m: nextMonth, dan: null })} aria-label="Sljedeći mjesec">
+              <LinkHint />
+        </Link>
+            <Link prefetch={false} href={hrefWith(basePath, params, { m: nextMonth, dan: null })} aria-label="Sljedeći mjesec">
               <IconNext />
-            </Link>
+              <LinkHint />
+        </Link>
           </div>
         </div>
         <div className="month__grid">
@@ -141,7 +155,7 @@ export async function CalendarView(props: {
               .join(" ");
             const label = `${formatDateLong(k)}${list.length ? `, stavki: ${list.length}` : ""}`;
             return (
-              <Link key={k} className={cls} href={hrefWith(basePath, params, { dan: k }, "#dan")} aria-label={label} scroll={false}>
+              <Link key={k} prefetch={false} className={cls} href={hrefWith(basePath, params, { dan: k }, "#dan")} aria-label={label} scroll={false}>
                 <span className="cell__num">{Number(k.slice(8))}</span>
                 {list.length ? (
                   <>
@@ -160,7 +174,8 @@ export async function CalendarView(props: {
                     </span>
                   </>
                 ) : null}
-              </Link>
+                <LinkHint />
+        </Link>
             );
           })}
         </div>
@@ -172,6 +187,7 @@ export async function CalendarView(props: {
         items={selectedItems}
         todayKey={todayKey}
         showCommunity={props.showCommunity}
+        external={props.external}
         empty={<div className="empty"><p>Za ovaj dan nema objava.</p></div>}
       />
     </>

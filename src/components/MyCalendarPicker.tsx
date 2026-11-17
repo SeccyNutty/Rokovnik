@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { countLabel } from "./CommunityList";
 
 const STORAGE_KEY = "rokovnik:moje-zajednice";
@@ -14,6 +14,13 @@ type Option = { slug: string; name: string; upcoming: number };
  */
 export function MyCalendarPicker(props: { options: Option[]; selected: string[]; hasParam: boolean }) {
   const router = useRouter();
+  // Kvačica reagira odmah; poslužitelj zatim složi kalendar za novi izbor.
+  const [selected, setSelected] = useState(props.selected);
+  const [seen, setSeen] = useState(props.selected);
+  if (seen !== props.selected) {
+    setSeen(props.selected);
+    setSelected(props.selected);
+  }
 
   useEffect(() => {
     try {
@@ -30,7 +37,8 @@ export function MyCalendarPicker(props: { options: Option[]; selected: string[];
   }, [props.hasParam, props.selected, props.options, router]);
 
   const toggle = (slug: string, on: boolean) => {
-    const next = props.options.map((o) => o.slug).filter((s) => (s === slug ? on : props.selected.includes(s)));
+    const next = props.options.map((o) => o.slug).filter((s) => (s === slug ? on : selected.includes(s)));
+    setSelected(next);
     try {
       window.localStorage.setItem(STORAGE_KEY, next.join(","));
     } catch {
@@ -43,7 +51,7 @@ export function MyCalendarPicker(props: { options: Option[]; selected: string[];
     <form className="paper" method="get" action="/moj">
       {props.options.map((o) => (
         <label key={o.slug} className="check">
-          <input type="checkbox" name="z" value={o.slug} checked={props.selected.includes(o.slug)} onChange={(e) => toggle(o.slug, e.target.checked)} />
+          <input type="checkbox" name="z" value={o.slug} checked={selected.includes(o.slug)} onChange={(e) => toggle(o.slug, e.target.checked)} />
           <span>
             <b style={{ fontWeight: 650 }}>{o.name}</b>
             <span className="clist__count">{countLabel(o.upcoming)}</span>

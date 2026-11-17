@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { CommunityWithCount } from "@/lib/queries";
+import { LinkHint } from "./LinkHint";
 
 export function initials(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
@@ -28,6 +29,7 @@ export function CommunityList({ communities, row = false }: { communities: Commu
             <span>
               <span className="clist__name">{c.name}</span>
               <span className="clist__count">{countLabel(c.upcoming)}</span>
+              <LinkHint />
             </span>
           </Link>
         </li>

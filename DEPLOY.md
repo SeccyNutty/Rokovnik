@@ -121,6 +121,14 @@ Kopiraj **Signing secret** (počinje s `whsec_`) u varijablu `RESEND_WEBHOOK_SEC
    - okružnica se obradi i objavi, a sljedeće s iste domene objavljuju se odmah.
 3. Otvori zajednicu, klikni na događaj i isprobaj **Dodaj u moj kalendar** te **Prati u svom kalendaru** na mobitelu i na računalu.
 
+## Brzina
+
+Aplikacija javne upite drži u predmemoriji i poništava je pri svakoj objavi, pa većina otvaranja stranice ne ide do baze. Tri postavke izvan koda još utječu na brzinu:
+
+1. **Regija funkcija.** Netlify funkcije se zadano izvršavaju u SAD-u (Ohio), a baza je u Frankfurtu, pa svaki upit koji ipak ide do baze prelazi ocean. Promjena: *Project configuration → Build & deploy → Continuous deployment → Functions region → Configure → EU (Frankfurt)*, zatim novi deploy. Ako tvoj plan ne nudi izbor regije, alternativa je Supabase projekt u regiji bližoj funkcijama ili hosting koji dopušta izbor regije.
+2. **Provjera:** `pnpm smoke https://tvoja-adresa`. Red „zdravlje” ispisuje koliko traje jedan upit (`bazaMs`). Ista regija daje nekoliko milisekundi; preko oceana oko 100 ms.
+3. **Topli poslužitelj.** `.github/workflows/keepalive.yml` svakih 10 minuta otvara stranicu, pa posjetitelji rjeđe čekaju hladni start (oko 2 s), a besplatna Supabase baza se ne pauzira. Uključuje se varijablom u GitHubu: *Settings → Secrets and variables → Actions → Variables → New variable*, ime `SITE_URL`, vrijednost adresa stranice bez kose crte na kraju.
+
 ## Automatsko prosljeđivanje okružnica
 
 U Gmailu: *Postavke → Prosljeđivanje* (ili filtar za pošiljatelja okružnica) na `INBOUND_ADDRESS`. Gmail prvo šalje potvrdni kôd na tu adresu; naći ćeš ga u Resendu pod **Emails → Receiving**. Kod automatskog prosljeđivanja pošiljatelj ostaje izvorni (npr. fakultet), pa svrstavanje radi i bez prepoznavanja proslijeđene poruke.

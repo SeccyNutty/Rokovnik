@@ -32,8 +32,20 @@ flowchart LR
 - **Popis po danima** (zadani prikaz, prilagođen mobitelu) i **mjesec**; filtar *sve / događaji / rokovi*. Rokovi su istaknuti crvenom.
 - **Klik na događaj otvara opis**, a na dnu je **„Dodaj u moj kalendar”** (Google, Outlook.com, Microsoft 365, Apple i ostali preko .ics). Izbor aplikacije se pamti, pa je svako sljedeće dodavanje jedan klik.
 - **„Prati u svom kalendaru”**: pretplata na cijeli kalendar zajednice (ICS). Nema integracije s pojedinim kalendarima; koristi se adresa za pretplatu koju svi podržavaju.
-- **Moj kalendar**: izbor više zajednica u jedan kalendar i jednu pretplatu, bez korisničkog računa (izbor se pamti na uređaju).
-- **Ugradnja**: `/ugradi/<zajednica>` za iframe na stranici organizacije.
+- **Moj kalendar**: izbor više zajednica i pojedinačno dodanih događaja u jedan kalendar i jednu pretplatu, bez korisničkog računa (izbor se pamti na uređaju).
+
+## Konektor za stranice organizacija
+
+Organizacija kalendar svoje zajednice stavlja na vlastitu domenu jednim retkom koda. Kôd se slaže na `/z/<zajednica>/ugradi` (izbor postavki, pregled uživo, gumb za kopiranje):
+
+```html
+<script async src="https://<rokovnik>/widget.js" data-rokovnik="fsb"></script>
+```
+
+- Visina se sama prilagođava sadržaju; nove objave stižu bez ikakve izmjene na stranici organizacije.
+- Postavke: `data-prikaz="mjesec"`, `data-vrsta="rokovi|dogadaji"`, `data-broj`, `data-kontrole="ne"`, `data-tema="tamna"`, `data-boja="#rrggbb"`, `data-visina`.
+- Bez skripti: obični `<iframe src="https://<rokovnik>/ugradi/fsb">`.
+- Vlastiti dizajn: javni JSON API, `GET /api/v1/zajednice` i `GET /api/v1/zajednice/<zajednica>/stavke?vrsta=&od=&do=&broj=` (CORS otvoren, samo čitanje).
 
 ## Lokalno pokretanje
 
@@ -59,12 +71,20 @@ INBOUND_SECRET=tajna pnpm mail:test --from "Okružnica <okruznica@fsb.unizg.hr>"
 
 ## Provjere
 
+Tri razine, svaka jednom naredbom:
+
 ```bash
-pnpm test        # 38 testova: vrijeme i ljetno računanje, svrstavanje, prosljeđivanje, ICS, potpisi, cijeli tok maila
-pnpm lint && pnpm typecheck && pnpm build
+pnpm test          # logika: vrijeme, svrstavanje pošiljatelja, prosljeđivanje, ICS, potpisi, cijeli tok maila
+pnpm test:e2e      # preglednik: sve funkcije kao što ih vidi korisnik, na računalu i na mobitelu
+pnpm smoke https://tvoja-adresa   # objavljena stranica: radi li sve i koliko brzo (samo čita)
+pnpm test:all      # lint + tipovi + test + test:e2e
 ```
 
-Testovi cijelog toka (`tests/pipeline.test.ts`) rade nad pravom Postgres shemom u memoriji, s lažnim AI odgovorom.
+- **`pnpm test:e2e`** sam izgradi i pokrene aplikaciju s praznom ugrađenom bazom i bez AI-ja, pa ne dira pravu bazu, ne šalje mailove i ništa ne naplaćuje (i kad postoji `.env.local`). Prvi put treba preglednik: `pnpm exec playwright install chromium`. Izvještaj s koracima i snimkama grešaka: `pnpm exec playwright show-report`.
+- Pokriva: mail nepoznate organizacije → zahtjev → potvrda → objava; sljedeći mail bez potvrde; duplikate; odbijanje pošiljatelja; sakrivanje objave; filtre i mjesec; opis događaja i poveznice za kalendare; Moj kalendar; ICS; widget na tuđoj stranici (automatska visina, postavke); JSON API; sigurnosna zaglavlja; izgled bez vodoravnog klizača.
+- Testovi cijelog toka u `tests/pipeline.test.ts` rade nad pravom Postgres shemom u memoriji, s lažnim AI odgovorom.
+
+Stanje i plan: [ROADMAP.md](ROADMAP.md).
 
 ## Postavljanje online
 
@@ -93,8 +113,4 @@ Upute korak po korak: [DEPLOY.md](DEPLOY.md). Sve postavke: [.env.example](.env.
 
 ## Što još nije izgrađeno
 
-- Tjedni e-mail sažetak i podsjetnici pred rok.
-- Potvrda pošiljatelju („Vaš događaj je objavljen”).
-- Sučelje na engleskom.
-- Korisnički računi i preporuke.
-- Uređivanje teksta objave u administraciji (zasad: sakrij ili pošalji ispravljeni mail).
+Vidi [ROADMAP.md](ROADMAP.md).

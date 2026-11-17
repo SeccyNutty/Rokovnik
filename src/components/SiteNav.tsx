@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { LinkHint } from "./LinkHint";
 import { IconBookmark, IconList, IconSend } from "./icons";
 
 const LINKS = [
@@ -18,6 +19,7 @@ export function SiteNav() {
         <Link key={l.href} href={l.href} aria-current={l.match(pathname) ? "page" : undefined}>
           {l.icon}
           {l.label}
+          <LinkHint />
         </Link>
       ))}
     </nav>

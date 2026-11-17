@@ -9,6 +9,7 @@ import { getDb } from "@/db";
 import { communities, items } from "@/db/schema";
 import { isAdmin, requireAdmin } from "@/lib/auth";
 import { baseUrl } from "@/lib/base-url";
+import { touchData } from "@/lib/cache";
 import { adminPassword, isProd } from "@/lib/config";
 import { approveRequest, ingestEmail, processMessage, rejectRequest } from "@/lib/pipeline";
 import { createSessionValue, safeEqual, SESSION_COOKIE, SESSION_MAX_AGE, verifyRequestToken } from "@/lib/tokens";
@@ -98,6 +99,7 @@ export async function toggleItemAction(form: FormData): Promise<void> {
       .set({ status: row.status === "published" ? "hidden" : "published", updatedAt: new Date() })
       .where(eq(items.id, id));
   }
+  await touchData();
   revalidatePath("/", "layout");
   redirect("/admin#objave");
 }
@@ -112,6 +114,7 @@ export async function saveCommunityAction(form: FormData): Promise<void> {
       .set({ name, description: str(form, "description").slice(0, 400) })
       .where(eq(communities.id, str(form, "communityId")));
   }
+  await touchData();
   revalidatePath("/", "layout");
   redirect("/admin?poruka=spremljeno#zajednice");
 }

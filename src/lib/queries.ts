@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { communities, communityRequests, items, messages, senderRules, type Community, type Item } from "@/db/schema";
+import { cachedQuery } from "./cache";
 import { addEventLinks, type AddLinks } from "./calendar-links";
 import { CATEGORY_LABELS, type Category } from "./extract/types";
 import type { IcsItem } from "./ics";
@@ -129,7 +130,27 @@ export type ItemFilter = {
   includeHidden?: boolean;
 };
 
-export async function listItems(f: ItemFilter = {}): Promise<ItemRow[]> {
+/** Filtar u obliku pogodnom za ključ predmemorije: datumi kao ISO tekst, polja poredana. */
+type ItemFilterKey = Omit<ItemFilter, "from" | "to"> & { from?: string; to?: string };
+
+const listItemsCached = cachedQuery("stavke", (k: ItemFilterKey) =>
+  listItemsFresh({ ...k, from: k.from ? new Date(k.from) : undefined, to: k.to ? new Date(k.to) : undefined }),
+);
+
+/** Stavke prema filtru. Javni upiti idu kroz predmemoriju; administracija (includeHidden) uvijek čita bazu. */
+export function listItems(f: ItemFilter = {}): Promise<ItemRow[]> {
+  if (f.includeHidden) return listItemsFresh(f);
+  return listItemsCached({
+    communityIds: f.communityIds ? [...f.communityIds].sort() : undefined,
+    itemIds: f.itemIds?.length ? [...f.itemIds].sort() : undefined,
+    kind: f.kind,
+    from: f.from?.toISOString(),
+    to: f.to?.toISOString(),
+    limit: f.limit,
+  });
+}
+
+async function listItemsFresh(f: ItemFilter = {}): Promise<ItemRow[]> {
   const itemIds = f.itemIds ?? [];
   if (f.communityIds && f.communityIds.length === 0 && itemIds.length === 0) return [];
   const db = await getDb();
@@ -160,7 +181,13 @@ export function listUpcoming(f: Omit<ItemFilter, "from"> = {}, now = new Date())
   return listItems({ ...f, from: startOfToday(now) });
 }
 
-export async function getItem(id: string, includeHidden = false): Promise<ItemRow | null> {
+const getItemCached = cachedQuery("stavka", (id: string) => getItemFresh(id, false));
+
+export function getItem(id: string, includeHidden = false): Promise<ItemRow | null> {
+  return includeHidden ? getItemFresh(id, true) : getItemCached(id.toLowerCase());
+}
+
+async function getItemFresh(id: string, includeHidden: boolean): Promise<ItemRow | null> {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return null;
   const db = await getDb();
   const [row] = await db
@@ -173,29 +200,48 @@ export async function getItem(id: string, includeHidden = false): Promise<ItemRo
 
 export type CommunityWithCount = Community & { upcoming: number };
 
-export async function listCommunities(now = new Date()): Promise<CommunityWithCount[]> {
+const listCommunitiesCached = cachedQuery("zajednice", (todayIso: string) => listCommunitiesFresh(new Date(todayIso)));
+
+/** Sve zajednice s brojem nadolazećih objava. */
+export function listCommunities(now = new Date()): Promise<CommunityWithCount[]> {
+  return listCommunitiesCached(startOfToday(now).toISOString());
+}
+
+async function listCommunitiesFresh(today: Date): Promise<CommunityWithCount[]> {
   const db = await getDb();
-  const all = await db.select().from(communities).orderBy(asc(communities.name));
-  const counts = await db
-    .select({ communityId: items.communityId, n: count() })
-    .from(items)
-    .where(and(eq(items.status, "published"), gte(sql`coalesce(${items.endsAt}, ${items.startsAt})`, ts(startOfToday(now)))))
-    .groupBy(items.communityId);
+  // Dva neovisna upita idu usporedno (svaki svojom vezom).
+  const [all, counts] = await Promise.all([
+    db.select().from(communities).orderBy(asc(communities.name)),
+    db
+      .select({ communityId: items.communityId, n: count() })
+      .from(items)
+      .where(and(eq(items.status, "published"), gte(sql`coalesce(${items.endsAt}, ${items.startsAt})`, ts(today))))
+      .groupBy(items.communityId),
+  ]);
   const byId = new Map(counts.map((c) => [c.communityId, Number(c.n)]));
   return all.map((c) => ({ ...c, upcoming: byId.get(c.id) ?? 0 }));
 }
 
-export async function getCommunityBySlug(slug: string): Promise<Community | null> {
+const communityBySlugCached = cachedQuery("zajednica", async (slug: string): Promise<Community | null> => {
   const db = await getDb();
-  const [row] = await db.select().from(communities).where(eq(communities.slug, slug.toLowerCase()));
+  const [row] = await db.select().from(communities).where(eq(communities.slug, slug));
   return row ?? null;
+});
+
+export function getCommunityBySlug(slug: string): Promise<Community | null> {
+  const clean = slug.toLowerCase();
+  // Neispravne adrese ne idu ni u predmemoriju ni u bazu.
+  return /^[a-z0-9-]{1,60}$/.test(clean) ? communityBySlugCached(clean) : Promise.resolve(null);
 }
 
-export async function getCommunitiesBySlugs(slugs: string[]): Promise<Community[]> {
-  const clean = [...new Set(slugs.map((s) => s.toLowerCase()).filter((s) => /^[a-z0-9-]{1,60}$/.test(s)))];
-  if (!clean.length) return [];
+const communitiesBySlugsCached = cachedQuery("zajednice-po-adresi", async (clean: string[]): Promise<Community[]> => {
   const db = await getDb();
   return db.select().from(communities).where(inArray(communities.slug, clean)).orderBy(asc(communities.name));
+});
+
+export function getCommunitiesBySlugs(slugs: string[]): Promise<Community[]> {
+  const clean = [...new Set(slugs.map((s) => s.toLowerCase()).filter((s) => /^[a-z0-9-]{1,60}$/.test(s)))].sort();
+  return clean.length ? communitiesBySlugsCached(clean) : Promise.resolve([]);
 }
 
 // ── Administracija ────────────────────────────────────────────────────────────
