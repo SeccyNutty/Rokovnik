@@ -134,6 +134,52 @@ Napravljeno: predmemorija upita s trenutnim poništavanjem (1., 3.), usporedni u
 15. Predmemorija stranica na CDN-u kad promet naraste.
 16. Model prihoda (sponzori; besplatno za organizacije koje ne zarađuju).
 17. Obavijest mailom onima koji su tražili organizaciju, kad se ona pridruži (adrese se već spremaju).
+18. **Statistika za organizacije**: pregledi, jedinstveni posjetitelji, povratnici, klikovi na prijavu. Razrada je u odjeljku [Plan: statistika za organizacije](#plan-statistika-za-organizacije). Samo bilježenje vrijedi uključiti ranije od prikaza, jer se pregledi ne mogu naknadno izbrojiti.
+
+## Plan: statistika za organizacije
+
+Cilj: organizacija vidi koliko joj objava na Rokovniku donosi. To joj je mjerilo učinkovitosti, a nama glavni argument zašto da objavljuje kod nas.
+
+### Što se mjeri po objavi
+
+| Mjera | Kako | Napomena |
+|---|---|---|
+| Pregledi | svako otvaranje opisa objave (naša stranica, widget) | |
+| Jedinstveni posjetitelji | prijavljeni po računu; gosti po anonimnom dnevnom ključu, bez kolačića | gost se broji jednom dnevno, ne kroz više dana |
+| Povratnici | koliko je ljudi objavu otvorilo 1, 2–3 ili 4 i više puta | samo prijavljeni korisnici; organizacija vidi samo raspodjelu |
+| Klik na prijavu | poveznica za prijavu ide preko naše adrese za preusmjeravanje | najbliže stvarnoj prijavi što možemo izmjeriti |
+| Namjera | „Dodaj u Rokovnik”, dodavanje u Google/Outlook/.ics, novi pratitelji zajednice | |
+| Izvor | naša stranica, widget (s koje domene), tematska zajednica | |
+
+Izvedene brojke:
+
+- **Konverzija**: klikovi na prijavu ÷ jedinstveni posjetitelji.
+- **Predomišljanje**: koliko je ljudi kliknulo prijavu tek nakon dva ili više posjeta.
+
+### Koliko se ljudi stvarno prijavilo
+
+Prijava se odvija na obrascu organizatora, pa je Rokovnik ne vidi. Mogućnosti, od najjednostavnije:
+
+1. Brojimo klikove na poveznicu za prijavu.
+2. Poveznici dodajemo `utm_source=rokovnik`, pa organizacija u svojoj analitici vidi koliko je prijava došlo od nas.
+3. Kasnije: vlastiti gumb „Dolazim” ili prijava kroz Rokovnik. Tada broj prijava postaje točan.
+
+### Privatnost (GDPR)
+
+- Organizacija vidi samo zbirne brojeve, nikad tko je gledao.
+- Brojevi manji od 5 prikazuju se kao „< 5”, da se pojedinac ne može prepoznati.
+- Gosti se broje bez kolačića: ključ je sažetak (hash) IP adrese i preglednika s tajnom koja se mijenja i briše svaki dan. Zato ne treba obavijest o kolačićima. Cijena je da gosta ne možemo pratiti kroz više dana.
+- Praćenje povrataka za prijavljene korisnike opisano je u pravilima privatnosti i može se isključiti u „Moj račun”. Pravnu osnovu provjeriti u sklopu točke 11.
+- Pojedinačni zapisi čuvaju se 90 dana, nakon toga ostaju samo dnevni zbrojevi.
+- Botovi i unaprijedno učitavanje stranica (prefetch) se ne broje.
+
+### Tehnički
+
+- Preglednik šalje zapis nakon učitavanja stranice (`sendBeacon`). Stranice tako ostaju u predmemoriji i brzina se ne mijenja.
+- Tablica pojedinačnih događaja i tablica dnevnih zbrojeva, obje s RLS-om.
+- Poveznica za prijavu ide kroz `/r/<objava>`: zabilježi klik, pa preusmjeri na obrazac organizatora (`registrationUrl`).
+- Prikaz u `/organizacija`: po objavi brojke i graf kroz vrijeme. Administrator vidi sve organizacije.
+- Mail organizaciji nakon roka ili događaja, npr. „312 pregleda, 190 ljudi, 41 klik na prijavu”. Ovisi o vlastitoj domeni (točka 8).
 
 ## Poznata ograničenja
 
