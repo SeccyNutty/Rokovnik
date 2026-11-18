@@ -6,7 +6,8 @@ import { FollowButton } from "@/components/FollowButton";
 import { Subscribe } from "@/components/Subscribe";
 import { baseUrl } from "@/lib/base-url";
 import { inboundAddress } from "@/lib/config";
-import { getCommunityBySlug } from "@/lib/queries";
+import { getCommunityBySlug, scopeFor } from "@/lib/queries";
+import { tagLabel } from "@/lib/tags";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,9 @@ export default async function CommunityPage({ params, searchParams }: Props) {
   const community = await getCommunityBySlug(slug);
   if (!community) notFound();
   const address = inboundAddress();
+  const topic = community.kind === "topic";
+  const scope = scopeFor([community]);
+  const topicTags = community.topicTags.map((t) => ({ key: t, label: tagLabel(t) }));
 
   return (
     <div className="split">
@@ -31,8 +35,26 @@ export default async function CommunityPage({ params, searchParams }: Props) {
           <div className="crumb">
             <Link href="/">Sve zajednice</Link>
           </div>
-          <h1>{community.name}</h1>
+          <h1>
+            {community.name}
+            {topic ? (
+              <span className="badge badge--topic" style={{ marginLeft: 10, verticalAlign: 6, fontSize: 13 }}>
+                tema
+              </span>
+            ) : null}
+          </h1>
           {community.description ? <p className="lead">{community.description}</p> : null}
+          {topic ? (
+            <p className="note" style={{ marginTop: 6 }}>
+              Objave svih organizacija s oznakom {topicTags.map((t, i) => (
+                <span key={t.key}>
+                  {i ? (i === topicTags.length - 1 ? " ili " : ", ") : ""}
+                  <b>{t.label}</b>
+                </span>
+              ))}
+              .
+            </p>
+          ) : null}
           <div className="only-mobile" style={{ marginTop: 14 }}>
             <div style={{ display: "grid", gap: 8 }}>
               <FollowButton slug={community.slug} name={community.name} block />
@@ -43,12 +65,17 @@ export default async function CommunityPage({ params, searchParams }: Props) {
         <CalendarView
           basePath={`/z/${community.slug}`}
           params={sp}
-          communityIds={[community.id]}
-          showCommunity={false}
+          communityIds={scope.communityIds}
+          anyTags={scope.anyTags}
+          showCommunity={topic}
           empty={
             <div className="empty">
               <h3>Nema nadolazećih objava</h3>
-              <p>Kad {community.name} pošalje obavijest o događaju ili roku, pojavit će se ovdje i u kalendarima svih koji prate zajednicu.</p>
+              <p>
+                {topic
+                  ? "Kad neka organizacija objavi događaj ili rok s ovom temom, pojavit će se ovdje i u kalendarima svih koji prate temu."
+                  : `Kad ${community.name} pošalje obavijest o događaju ili roku, pojavit će se ovdje i u kalendarima svih koji prate zajednicu.`}
+              </p>
             </div>
           }
         />
@@ -64,10 +91,16 @@ export default async function CommunityPage({ params, searchParams }: Props) {
           </p>
         </div>
         <div className="paper paper--pad note" style={{ marginTop: 16 }}>
+          {topic ? (
+            <p>
+              <b>Tematska zajednica.</b> Skuplja objave svih organizacija po oznaci teme, koju AI dodjeljuje svakoj objavi. Organizacije ne trebaju ništa posebno slati.
+            </p>
+          ) : (
           <p>
             <b>Za organizatore.</b> Objava je običan mail{address ? <> na <b>{address}</b></> : null}: sustav sam pročita događaj i rokove.{" "}
             <Link href="/objavi">Kako to radi</Link>
           </p>
+          )}
           <p className="note" style={{ marginTop: 14 }}>
             <Link href={`/z/${community.slug}/ugradi`}>Ugradi ovaj kalendar na svoju stranicu</Link>
           </p>

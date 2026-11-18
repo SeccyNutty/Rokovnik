@@ -3,6 +3,7 @@ import { getDb, type Db } from "@/db";
 import { items as itemsTable } from "@/db/schema";
 import { communities, communityRequests, items, messages, senderRules, type Community, type CommunityRequest, type Message, type NewItem } from "@/db/schema";
 import { touchData } from "./cache";
+import { CATEGORY_TO_TAG, cleanTags, guessTags, TAG_KEYS } from "./tags";
 import { sendPublisherFeedback, type FeedbackInput } from "./feedback";
 import { allow } from "./ratelimit";
 import { senderVerdict } from "./sender-auth";
@@ -92,6 +93,10 @@ function safeUrl(u: string | null): string | null {
   }
 }
 
+const CATEGORY_FROM_TAG: Record<string, string | undefined> = Object.fromEntries(
+  Object.entries(CATEGORY_TO_TAG).map(([category, tag]) => [tag, category]),
+);
+
 /** Izvučena stavka → redak u bazi. Vraća null za neispravne ili besmislene datume. */
 export function toNewItem(x: ExtractedItem, communityId: string, messageId: string | null, receivedAt: Date): NewItem | null {
   if (!isValidDateKey(x.start_date)) return null;
@@ -124,7 +129,8 @@ export function toNewItem(x: ExtractedItem, communityId: string, messageId: stri
     onlineUrl: safeUrl(x.online_url),
     registrationUrl: safeUrl(x.registration_url),
     organizer: x.organizer,
-    category: x.category,
+    category: x.category !== "other" ? x.category : (CATEGORY_FROM_TAG[x.tags[0] ?? ""] ?? "other"),
+    tags: x.tags.length ? x.tags : guessTags(`${title}\n${x.summary}`),
     confidence: x.confidence,
     dedupeKey: `${x.kind}|${x.start_date}|${slugify(title).slice(0, 60)}`,
   };
@@ -355,6 +361,7 @@ export async function processMessage(messageId: string, deps: PipelineDeps = {},
             registrationUrl: row.registrationUrl,
             organizer: row.organizer,
             category: row.category,
+            tags: row.tags,
             confidence: row.confidence,
             sequence: sql`${items.sequence} + 1`,
             updatedAt: new Date(),
@@ -388,12 +395,23 @@ async function uniqueSlug(db: Db, wanted: string): Promise<string> {
   return `${base}-${Date.now().toString(36)}`;
 }
 
-export async function createCommunity(input: { name: string; slug?: string; description?: string }): Promise<Community> {
+export async function createCommunity(input: { name: string; slug?: string; description?: string; topicTags?: string[] }): Promise<Community> {
   const db = await getDb();
   const name = input.name.trim().slice(0, 80);
   if (!name) throw new Error("Ime zajednice je obavezno.");
   const slug = await uniqueSlug(db, input.slug?.trim() || name);
-  const [row] = await db.insert(communities).values({ name, slug, description: (input.description ?? "").trim() }).returning();
+  const topic = input.topicTags !== undefined;
+  const [row] = await db
+    .insert(communities)
+    .values({
+      name,
+      slug,
+      description: (input.description ?? "").trim().slice(0, 400),
+      // Tematska zajednica nema pošiljatelja: skuplja objave svih organizacija po oznakama.
+      kind: topic ? "topic" : "organization",
+      topicTags: topic ? cleanTags(input.topicTags, TAG_KEYS.length) : [],
+    })
+    .returning();
   return row;
 }
 
@@ -424,6 +442,8 @@ export async function approveRequest(
   let community: Community | undefined;
   if (input.existingCommunityId) {
     [community] = await db.select().from(communities).where(eq(communities.id, input.existingCommunityId));
+    // Pošiljatelj se veže samo uz zajednicu organizacije, nikad uz tematsku.
+    if (community?.kind === "topic") community = undefined;
   }
   community ??= await createCommunity({ name: input.name?.trim() || request.suggestedName, slug: input.slug?.trim() || request.suggestedSlug });
 

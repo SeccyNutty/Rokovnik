@@ -21,7 +21,7 @@ test("filtar Rokovi prikazuje samo rokove, Događaji samo događaje", async ({ p
   await page.locator(".chips").getByRole("link", { name: "Događaji" }).click();
   await expect(page).toHaveURL(/vrsta=dogadaji/);
   await expect(page.locator(".entry--rok")).toHaveCount(0);
-  await page.locator(".chips").getByRole("link", { name: "Sve" }).click();
+  await page.locator(".chips").getByRole("link", { name: "Sve", exact: true }).click();
   await expect(page.locator(".entry")).toHaveCount(all);
 });
 

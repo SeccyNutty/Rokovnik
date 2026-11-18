@@ -1,5 +1,6 @@
 import { APP_NAME } from "./config";
 import { addDays, dateKey } from "./time";
+import { tagLabel } from "./tags";
 
 /** Generiranje iCalendar (RFC 5545) zapisa. Vremena su u UTC-u, cjelodnevne stavke kao DATE. */
 
@@ -17,6 +18,7 @@ export type IcsItem = {
   registrationUrl: string | null;
   communityName: string;
   category: string;
+  tags?: string[];
   sequence: number;
   updatedAt: Date;
 };
@@ -120,7 +122,7 @@ function eventLines(i: IcsItem, baseUrl: string): string[] {
   if (location) lines.push(`LOCATION:${escapeText(location)}`);
   lines.push(`DESCRIPTION:${escapeText(calendarDescription(i, url))}`);
   lines.push(`URL:${url}`);
-  lines.push(`CATEGORIES:${escapeText(i.communityName)}`);
+  lines.push(`CATEGORIES:${[i.communityName, ...(i.tags ?? []).map(tagLabel)].map(escapeText).join(",")}`);
   if (i.kind === "deadline") {
     lines.push("BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${escapeText(calendarTitle(i))}`, "TRIGGER:-P1D", "END:VALARM");
   }

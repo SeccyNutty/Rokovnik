@@ -6,7 +6,7 @@ import { parseExtractedItems, type ExtractionInput, type ExtractionResult } from
 const FORMAT = `
 
 Odgovori ISKLJUČIVO jednim JSON objektom ovog oblika, bez dodatnog teksta:
-{"items":[{"kind":"event"|"deadline","title":"…","summary":"…","description":"…","start_date":"YYYY-MM-DD","start_time":"HH:MM"|null,"end_date":"YYYY-MM-DD"|null,"end_time":"HH:MM"|null,"location":string|null,"online_url":string|null,"registration_url":string|null,"organizer":string|null,"category":"lecture"|"workshop"|"hackathon"|"competition"|"fair"|"scholarship"|"call"|"social"|"other","confidence":0.0-1.0}]}
+{"items":[{"kind":"event"|"deadline","title":"…","summary":"…","description":"…","start_date":"YYYY-MM-DD","start_time":"HH:MM"|null,"end_date":"YYYY-MM-DD"|null,"end_time":"HH:MM"|null,"location":string|null,"online_url":string|null,"registration_url":string|null,"organizer":string|null,"tags":["ključ oznake", …],"confidence":0.0-1.0}]}
 Ako u mailu nema stavki, vrati {"items":[]}.`;
 
 type Part = { text: string } | { inlineData: { mimeType: string; data: string } };

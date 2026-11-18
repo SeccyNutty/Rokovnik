@@ -1,6 +1,7 @@
 import { cleanSubject, stripForwardHeader } from "../sender";
 import { addDays, dateKey, isValidDateKey } from "../time";
 import type { ExtractedItem, ExtractionInput, ExtractionResult } from "./types";
+import { guessTags } from "../tags";
 
 /**
  * Izvlačenje bez AI-ja, prema pravilima. Koristi se kad ANTHROPIC_API_KEY nije
@@ -115,6 +116,7 @@ export async function extractWithRules(input: ExtractionInput): Promise<Extracti
     online_url: null,
     organizer: null,
     category: "other" as const,
+    tags: guessTags(`${subject}\n${body}`),
     confidence: 0.4,
   };
 

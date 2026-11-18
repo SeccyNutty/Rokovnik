@@ -6,7 +6,17 @@ import { getDb } from "@/db";
  * brojača u memoriji). Vraća true ako je radnja dopuštena: najviše `limit` u `windowSeconds`.
  * Ako baza zakaže, radnju dopuštamo: ograničenje je dodatna zaštita, a ne jedina.
  */
-export async function allow(key: string, limit: number, windowSeconds: number, now = new Date()): Promise<boolean> {
+/**
+ * RATE_LIMIT_MULTIPLIER (samo za automatske testove, koji se prijavljuju puno puta zaredom)
+ * može ograničenja samo povećati, nikad ukinuti ni smanjiti.
+ */
+function multiplier(): number {
+  const m = Number(process.env.RATE_LIMIT_MULTIPLIER);
+  return Number.isFinite(m) && m > 1 ? Math.min(m, 100) : 1;
+}
+
+export async function allow(key: string, baseLimit: number, windowSeconds: number, now = new Date()): Promise<boolean> {
+  const limit = baseLimit * multiplier();
   const nowIso = now.toISOString();
   const cutoff = new Date(now.getTime() - windowSeconds * 1000).toISOString();
   try {

@@ -13,6 +13,8 @@ export async function GET(request: Request) {
       adresa: c.slug,
       ime: c.name,
       opis: c.description,
+      vrsta: c.kind === "topic" ? "tema" : "organizacija",
+      oznake: c.kind === "topic" ? c.topicTags : undefined,
       nadolazece: c.upcoming,
       stranica: `${origin}/z/${c.slug}`,
       kalendar: `${origin}/ics/${c.slug}.ics`,

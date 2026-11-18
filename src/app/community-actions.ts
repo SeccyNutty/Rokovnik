@@ -9,7 +9,9 @@ import { audit } from "@/lib/audit";
 import { actorLabel, currentUser, isAdmin } from "@/lib/auth";
 import { baseUrl } from "@/lib/base-url";
 import { touchData } from "@/lib/cache";
-import { discardMessage, releaseMessage } from "@/lib/pipeline";
+import { createCommunity, discardMessage, releaseMessage } from "@/lib/pipeline";
+import { setOrganizationRequestStatus } from "@/lib/org-requests";
+import { cleanTags, MAX_TAGS, TAG_KEYS } from "@/lib/tags";
 import { requestKeyFor } from "@/lib/sender";
 import { canManage } from "@/lib/users";
 
@@ -48,6 +50,19 @@ export async function saveCommunityAction(form: FormData): Promise<void> {
   const senderMode = str(form, "senderMode") === "addresses" ? "addresses" : "domain";
   const [before] = await db.select().from(communities).where(eq(communities.id, id));
   if (!before) back(form, "nema");
+  if (before.kind === "topic") {
+    // Tematsku zajednicu uređuje samo administrator.
+    if (!admin) back(form, "nema-ovlasti");
+    const topicTags = cleanTags(form.getAll("topicTags"), TAG_KEYS.length);
+    if (!topicTags.length) back(form, "tema-bez-oznaka");
+    await db
+      .update(communities)
+      .set({ name: name || before.name, description: str(form, "description").slice(0, 400), topicTags })
+      .where(eq(communities.id, id));
+    await audit(actor, "tema-spremljena", before.slug, topicTags.join(","));
+    await changed();
+    back(form, "spremljeno");
+  }
   await db
     .update(communities)
     .set({
@@ -147,4 +162,39 @@ export async function toggleItemAction(form: FormData): Promise<void> {
   await audit(actor, status === "hidden" ? "objava-sakrivena" : "objava-prikazana", row.communityId, row.title);
   await changed();
   back(form, "spremljeno");
+}
+
+/** Oznake jedne objave (ispravak onoga što je dodijelio AI). */
+export async function setItemTagsAction(form: FormData): Promise<void> {
+  const db = await getDb();
+  const [row] = await db.select().from(items).where(eq(items.id, str(form, "itemId")));
+  if (!row) back(form, "nema");
+  const { actor } = await authorize(row.communityId);
+  const tags = cleanTags(form.getAll("tags"), MAX_TAGS);
+  await db.update(items).set({ tags, updatedAt: new Date() }).where(eq(items.id, row.id));
+  await audit(actor, "oznake-promijenjene", row.communityId, `${row.title}: ${tags.join(",")}`);
+  await changed();
+  back(form, "spremljeno");
+}
+
+/** Samo administrator: nova tematska zajednica (npr. "Stipendije" iz svih organizacija). */
+export async function createTopicAction(form: FormData): Promise<void> {
+  if (!(await isAdmin())) redirect("/admin/prijava");
+  const topicTags = cleanTags(form.getAll("topicTags"), TAG_KEYS.length);
+  const name = str(form, "name");
+  if (!name || !topicTags.length) redirect("/admin?poruka=tema-bez-oznaka#teme");
+  const community = await createCommunity({ name, slug: str(form, "slug") || undefined, description: str(form, "description"), topicTags });
+  await audit(await actorLabel(), "tema-stvorena", community.slug, topicTags.join(","));
+  await changed();
+  redirect(`/admin?poruka=tema-stvorena&z=${community.slug}#teme`);
+}
+
+/** Samo administrator: tražena organizacija je riješena ili odbačena. */
+export async function setOrgRequestStatusAction(form: FormData): Promise<void> {
+  if (!(await isAdmin())) redirect("/admin/prijava");
+  const status = str(form, "status");
+  if (status !== "done" && status !== "dismissed" && status !== "pending") redirect("/admin#trazene");
+  await setOrganizationRequestStatus(str(form, "requestId"), status);
+  await audit(await actorLabel(), "trazena-organizacija-status", str(form, "requestId"), status);
+  redirect("/admin?poruka=spremljeno#trazene");
 }

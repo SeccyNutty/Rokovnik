@@ -21,12 +21,12 @@ const lecture: Extractor = async () => ({
     {
       kind: "event", title: "Gostujuće predavanje: Suradnička robotika", summary: "Predavanje.", description: "Opis.",
       start_date: "2026-12-15", start_time: "14:15", end_date: null, end_time: "16:00", location: "Dvorana A",
-      online_url: null, registration_url: "https://example.org/prijava", organizer: "FSB", category: "lecture", confidence: 0.9,
+      online_url: null, registration_url: "https://example.org/prijava", organizer: "FSB", category: "lecture", tags: ["predavanje"], confidence: 0.9,
     },
     {
       kind: "deadline", title: "Prijava na predavanje", summary: "", description: "",
       start_date: "2026-12-10", start_time: null, end_date: null, end_time: null, location: null,
-      online_url: null, registration_url: "javascript:alert(1)", organizer: null, category: "lecture", confidence: 0.9,
+      online_url: null, registration_url: "javascript:alert(1)", organizer: null, category: "lecture", tags: ["predavanje"], confidence: 0.9,
     },
   ],
 });
@@ -107,7 +107,7 @@ describe("dolazni mail", () => {
     expect(notified).toEqual(["fsb.unizg.hr", "stud.fsb.unizg.hr"]);
     const next = await ingestEmail(mail({ from: "dekanat@fsb.unizg.hr", subject: "Novo" }), deps({ extract: async () => ({
       extractor: "ai",
-      items: [{ kind: "event", title: "Hackathon", summary: "", description: "", start_date: "2027-03-20", start_time: null, end_date: "2027-03-21", end_time: null, location: null, online_url: null, registration_url: null, organizer: null, category: "hackathon", confidence: 0.8 }],
+      items: [{ kind: "event", title: "Hackathon", summary: "", description: "", start_date: "2027-03-20", start_time: null, end_date: "2027-03-21", end_time: null, location: null, online_url: null, registration_url: null, organizer: null, category: "hackathon", tags: ["hackathon"], confidence: 0.8 }],
     }) }));
     expect(next.status).toBe("published");
     expect(next.itemIds).toHaveLength(1);

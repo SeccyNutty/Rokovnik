@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { cleanTags } from "../tags";
 
 export const CATEGORIES = [
   "lecture",
@@ -43,6 +44,8 @@ export const ExtractedItemSchema = z.object({
   registration_url: nullable,
   organizer: nullable,
   category: z.enum(CATEGORIES).catch("other"),
+  /** Oznake (teme) iz src/lib/tags.ts; nepoznate se odbacuju. */
+  tags: z.unknown().transform((v) => cleanTags(v)).catch([]),
   confidence: z.number().min(0).max(1).catch(0.5),
 });
 

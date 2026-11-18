@@ -4,7 +4,7 @@ import { CalendarView, type SearchParams } from "@/components/CalendarView";
 import { EmbedResizer } from "@/components/EmbedResizer";
 import { baseUrl } from "@/lib/base-url";
 import { APP_NAME } from "@/lib/config";
-import { getCommunityBySlug } from "@/lib/queries";
+import { getCommunityBySlug, scopeFor } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -38,8 +38,8 @@ export default async function EmbedPage({ params, searchParams }: Props) {
       <CalendarView
         basePath={`/ugradi/${community.slug}`}
         params={sp}
-        communityIds={[community.id]}
-        showCommunity={false}
+        {...scopeFor([community])}
+        showCommunity={community.kind === "topic"}
         limit={limit}
         external
         hideControls={one(sp.kontrole) === "ne"}

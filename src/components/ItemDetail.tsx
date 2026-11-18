@@ -43,6 +43,17 @@ export function ItemDetail({ item, heading = "h2" }: { item: ItemView; heading?:
         ) : null}
       </dl>
       {text ? <p className="detail__text">{text}</p> : null}
+      {item.tags.length ? (
+        <ul className="tags" aria-label="Teme">
+          {item.tags.map((t) => (
+            <li key={t.key}>
+              <a className="tag-pill" href={`/?tema=${t.key}`}>
+                {t.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {item.unsure ? (
         <p className="detail__unsure">Termin je automatski pročitan iz obavijesti i nije sasvim siguran. Provjeri ga kod organizatora.</p>
       ) : null}

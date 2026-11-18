@@ -6,7 +6,7 @@ import { Subscribe } from "@/components/Subscribe";
 import { currentUser } from "@/lib/auth";
 import { baseUrl } from "@/lib/base-url";
 import { googleConfigured } from "@/lib/google";
-import { listCommunities } from "@/lib/queries";
+import { listCommunities, scopeFor } from "@/lib/queries";
 import { userState } from "@/lib/users";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +40,7 @@ export default async function MyCalendarPage({ searchParams }: { searchParams: P
   const state = await userState(user.id);
   const chosen = communities.filter((c) => state.follows.includes(c.id));
   const hasAny = chosen.length > 0 || state.saved.length > 0;
+  const scope = scopeFor(chosen);
   const picker = <MyCalendarPicker options={communities} selected={chosen.map((c) => c.slug)} />;
 
   return (
@@ -58,7 +59,8 @@ export default async function MyCalendarPage({ searchParams }: { searchParams: P
           <CalendarView
             basePath="/moj"
             params={params}
-            communityIds={chosen.map((c) => c.id)}
+            communityIds={scope.communityIds}
+            anyTags={scope.anyTags}
             itemIds={state.saved}
             showCommunity
             empty={

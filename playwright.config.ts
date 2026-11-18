@@ -70,6 +70,8 @@ export default defineConfig({
       GOOGLE_CLIENT_SECRET: "e2e-tajna-klijenta",
       ADMIN_EMAILS: "admin@e2e.example",
       FEEDBACK_EMAILS: "off",
+      // Testovi se prijavljuju desetke puta u minuti; ograničenja ostaju, ali šira.
+      RATE_LIMIT_MULTIPLIER: "20",
     },
     },
   ],

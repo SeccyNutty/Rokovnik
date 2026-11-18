@@ -2,6 +2,7 @@ import Link from "next/link";
 import { addManagerAction, addSenderAction, decideHeldAction, removeManagerAction, removeSenderAction, saveCommunityAction } from "@/app/community-actions";
 import type { Community, SenderRule } from "@/db/schema";
 import { SubmitButton } from "./SubmitButton";
+import { TagCheckboxes } from "./TagCheckboxes";
 
 export type HeldMessage = { id: string; subject: string; senderAddress: string; error: string | null; receivedAt: Date };
 export type Manager = { id: string; email: string };
@@ -26,6 +27,41 @@ export function CommunitySettings(props: {
   );
   const domains = props.rules.filter((r) => r.kind === "domain");
   const addresses = props.rules.filter((r) => r.kind === "address");
+
+  if (c.kind === "topic") {
+    return (
+      <div data-testid={`zajednica-${c.slug}`}>
+        <form action={saveCommunityAction}>
+          {hidden}
+          <div className="field">
+            <label htmlFor={`cn-${id}`}>Ime</label>
+            <input id={`cn-${id}`} name="name" defaultValue={c.name} maxLength={80} required disabled={!props.admin} />
+          </div>
+          <div className="field">
+            <label htmlFor={`cd-${id}`}>Kratak opis</label>
+            <input id={`cd-${id}`} name="description" defaultValue={c.description} maxLength={400} disabled={!props.admin} />
+          </div>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <span style={{ fontWeight: 600, fontSize: 14.5 }}>Oznake koje tema skuplja (iz svih organizacija)</span>
+          </div>
+          <TagCheckboxes name="topicTags" selected={c.topicTags} idPrefix={`tt-${id.slice(0, 8)}`} />
+          <div className="linkrow">
+            {props.admin ? (
+              <SubmitButton className="btn btn--small" pending="Spremam…">
+                Spremi
+              </SubmitButton>
+            ) : null}
+            <Link className="btn btn--quiet btn--small" href={`/z/${c.slug}`}>
+              Otvori
+            </Link>
+            <Link className="btn btn--quiet btn--small" href={`/z/${c.slug}/ugradi`}>
+              Ugradnja
+            </Link>
+          </div>
+        </form>
+      </div>
+    );
+  }
 
   return (
     <div data-testid={`zajednica-${c.slug}`}>

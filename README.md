@@ -34,6 +34,12 @@ flowchart LR
 - **„Prati u svom kalendaru”**: pretplata na cijeli kalendar zajednice (ICS). Nema integracije s pojedinim kalendarima; koristi se adresa za pretplatu koju svi podržavaju.
 - **Moj kalendar** (račun putem Googlea): praćene zajednice i pojedinačno dodani događaji u jednom kalendaru, na svim uređajima, s tajnom osobnom pretplatom (ICS). Gost koji klikne „Dodaj u Moj kalendar” ili „Zaprati zajednicu” dobiva poziv na prijavu, a nakon prijave radnja je već izvršena.
 
+## Teme i pretraga
+
+- **Oznake (teme):** svaka objava dobiva 1–3 oznake s fiksnog popisa (Stipendije i potpore, Radionica, Cjeloživotno obrazovanje, EU fondovi, Jezici…; `src/lib/tags.ts`). Dodjeljuje ih AI, a organizacija i administrator ih mogu ispraviti. Kalendar ima filtar „Tema” (`?tema=stipendija`).
+- **Tematske zajednice:** zajednica bez pošiljatelja koja skuplja objave svih organizacija s odabranim oznakama (npr. „Stipendije” iz svih fakulteta i grada). Stvara ih administrator; prate se, pretplaćuju i ugrađuju kao i obične.
+- **Pretraga zajednica** na naslovnici (bez obzira na dijakritike i velika slova, i po kraticama). Ako organizacije nema, posjetitelj može zatražiti da se pridruži: zahtjevi istog naziva se zbrajaju, administrator dobiva mail i vidi ih u `/admin` → *Tražene organizacije*.
+
 ## Računi
 
 Tri vrste: **korisnik** (Moj kalendar), **organizacija** (upravlja svojom zajednicom na `/organizacija`) i **administrator** (`/admin`). Prijava je putem Googlea (OpenID Connect s PKCE-om, provjera potpisa tokena), uloge se provjeravaju u bazi pri svakoj radnji. Postavljanje: [DEPLOY.md](DEPLOY.md), korak 7.

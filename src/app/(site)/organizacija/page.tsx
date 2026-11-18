@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { toggleItemAction } from "@/app/community-actions";
 import { CommunitySettings } from "@/components/CommunitySettings";
+import { ItemTagsEditor } from "@/components/ItemTagsEditor";
 import { SubmitButton } from "@/components/SubmitButton";
 import { requireUser } from "@/lib/auth";
 import { inboundAddress } from "@/lib/config";
@@ -21,6 +22,7 @@ const FLASH: Record<string, { text: string; ok: boolean }> = {
   "adresa-tuda": { text: "Možeš dodati samo adrese s domene svoje zajednice. Za druge adrese javi se administratoru.", ok: false },
   "adresa-zauzeta": { text: "Ta adresa već pripada nekoj zajednici.", ok: false },
   "nema-ovlasti": { text: "Za tu radnju trebaš ovlasti administratora.", ok: false },
+  "tema-bez-oznaka": { text: "Tema treba barem jednu oznaku.", ok: false },
 };
 
 /** Račun organizacije: upravljanje zajednicama koje su korisniku dodijeljene. */
@@ -28,7 +30,7 @@ export default async function OrganizationPage({ searchParams }: { searchParams:
   const user = await requireUser("/organizacija");
   const sp = await searchParams;
   const admin = user.role === "admin";
-  const mine = admin ? await listCommunities() : await managedCommunities(user.email);
+  const mine = admin ? (await listCommunities()).filter((c) => c.kind !== "topic") : await managedCommunities(user.email);
   const ids = mine.map((c) => c.id);
   const [rules, held, managers, items] = await Promise.all([listRulesFor(ids), listHeldMessages(ids), admin ? listManagers(ids) : Promise.resolve([]), listItemsForManager(ids)]);
   const flash = sp.poruka ? FLASH[sp.poruka] : null;
@@ -80,6 +82,7 @@ export default async function OrganizationPage({ searchParams }: { searchParams:
                   <th>Termin</th>
                   <th>Naslov</th>
                   <th>Zajednica</th>
+                  <th>Oznake</th>
                   <th />
                 </tr>
               </thead>
@@ -94,6 +97,9 @@ export default async function OrganizationPage({ searchParams }: { searchParams:
                       {i.status === "hidden" ? <span className="tag"> skriveno</span> : null}
                     </td>
                     <td>{i.communityName}</td>
+                    <td>
+                      <ItemTagsEditor itemId={i.id} tags={i.tags} from="organizacija" />
+                    </td>
                     <td>
                       <form action={toggleItemAction} className="inline">
                         <input type="hidden" name="itemId" value={i.id} />

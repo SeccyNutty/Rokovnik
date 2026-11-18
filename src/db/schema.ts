@@ -10,6 +10,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 const ts = (name: string) => timestamp(name, { withTimezone: true, mode: "date" });
 
@@ -26,6 +27,12 @@ export const communities = pgTable("communities", {
   authMode: text("auth_mode").$type<"strict" | "relaxed">().notNull().default("strict"),
   /** "domain": objavljuje bilo tko s domene; "addresses": samo izričito dopuštene adrese. */
   senderMode: text("sender_mode").$type<"domain" | "addresses">().notNull().default("domain"),
+  /**
+   * "organization": objave stižu mailom od pošiljatelja te zajednice.
+   * "topic": tematska zajednica bez pošiljatelja; skuplja objave svih organizacija s oznakama iz topicTags.
+   */
+  kind: text("kind").$type<"organization" | "topic">().notNull().default("organization"),
+  topicTags: text("topic_tags").array().notNull().default(sql`'{}'::text[]`),
   createdAt: ts("created_at").notNull().defaultNow(),
 });
 
@@ -128,6 +135,8 @@ export const items = pgTable(
     registrationUrl: text("registration_url"),
     organizer: text("organizer"),
     category: text("category").notNull().default("other"),
+    /** Oznake (teme) iz src/lib/tags.ts. */
+    tags: text("tags").array().notNull().default(sql`'{}'::text[]`),
     confidence: real("confidence").notNull().default(1),
     status: text("status").$type<ItemStatus>().notNull().default("published"),
     dedupeKey: text("dedupe_key").notNull(),
@@ -141,6 +150,7 @@ export const items = pgTable(
     index("items_starts_idx").on(t.startsAt),
     // Kalendar jedne zajednice: nadolazeće stavke poredane po početku.
     index("items_community_starts_idx").on(t.communityId, t.startsAt),
+    index("items_tags_idx").using("gin", t.tags),
   ],
 );
 
@@ -222,6 +232,25 @@ export const auditLog = pgTable(
   (t) => [index("audit_log_at_idx").on(t.at)],
 );
 
+/**
+ * Posjetitelj je tražio da se organizacija pridruži (pretraga nije našla zajednicu).
+ * Isti naziv (bez obzira na velika slova i dijakritike) zbraja zahtjeve.
+ */
+export const organizationRequests = pgTable("organization_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  nameKey: text("name_key").notNull().unique(),
+  website: text("website").notNull().default(""),
+  note: text("note").notNull().default(""),
+  /** Adrese onih koji žele obavijest kad se organizacija pridruži (neobavezno, najviše 50). */
+  contactEmails: text("contact_emails").array().notNull().default(sql`'{}'::text[]`),
+  requestCount: integer("request_count").notNull().default(1),
+  status: text("status").$type<"pending" | "done" | "dismissed">().notNull().default("pending"),
+  createdAt: ts("created_at").notNull().defaultNow(),
+  lastRequestedAt: ts("last_requested_at").notNull().defaultNow(),
+});
+
+export type OrganizationRequest = typeof organizationRequests.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Community = typeof communities.$inferSelect;
 export type SenderRule = typeof senderRules.$inferSelect;

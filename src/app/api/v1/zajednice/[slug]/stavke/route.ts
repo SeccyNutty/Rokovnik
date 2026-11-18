@@ -1,6 +1,7 @@
 import { apiJson, apiOptions } from "@/lib/api";
 import { baseUrlFromRequest } from "@/lib/base-url";
-import { getCommunityBySlug, listItems } from "@/lib/queries";
+import { getCommunityBySlug, listItems, scopeFor } from "@/lib/queries";
+import { isTag } from "@/lib/tags";
 import { isValidDateKey, startOfToday, zonedToUtc, addDays } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +9,7 @@ export const dynamic = "force-dynamic";
 /**
  * GET /api/v1/zajednice/<adresa>/stavke: događaji i rokovi jedne zajednice kao JSON,
  * za one koji kalendar žele prikazati vlastitim dizajnom.
- *   ?vrsta=rokovi|dogadaji   ?od=YYYY-MM-DD (zadano: danas)   ?do=YYYY-MM-DD   ?broj=1..200 (zadano 50)
+ *   ?vrsta=rokovi|dogadaji   ?tema=<oznaka>   ?od=YYYY-MM-DD (zadano: danas)   ?do=YYYY-MM-DD   ?broj=1..200 (zadano 50)
  */
 export async function GET(request: Request, ctx: { params: Promise<{ slug: string }> }) {
   const { slug } = await ctx.params;
@@ -24,15 +25,18 @@ export async function GET(request: Request, ctx: { params: Promise<{ slug: strin
   const limit = Math.min(Math.max(Number(url.searchParams.get("broj")) || 50, 1), 200);
 
   const origin = baseUrlFromRequest(request);
+  const tema = url.searchParams.get("tema");
+  if (tema && !isTag(tema)) return apiJson({ greska: "Nepoznata tema." }, 400);
   const rows = await listItems({
-    communityIds: [community.id],
+    ...scopeFor([community]),
     kind,
+    tag: tema ?? undefined,
     from: od ? zonedToUtc(od) : startOfToday(),
     to: d0 ? zonedToUtc(addDays(d0, 1)) : undefined,
     limit,
   });
   return apiJson({
-    zajednica: { adresa: community.slug, ime: community.name, stranica: `${origin}/z/${community.slug}` },
+    zajednica: { adresa: community.slug, ime: community.name, vrsta: community.kind === "topic" ? "tema" : "organizacija", stranica: `${origin}/z/${community.slug}` },
     stavke: rows.map((r) => ({
       id: r.id,
       vrsta: r.kind === "deadline" ? "rok" : "dogadaj",
@@ -47,6 +51,8 @@ export async function GET(request: Request, ctx: { params: Promise<{ slug: strin
       prijava: r.registrationUrl,
       organizator: r.organizer,
       kategorija: r.category,
+      oznake: r.tags,
+      organizacija: r.communityName,
       stranica: `${origin}/d/${r.id}`,
       ics: `${origin}/ics/d/${r.id}.ics`,
       azurirano: r.updatedAt.toISOString(),

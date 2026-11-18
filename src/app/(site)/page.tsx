@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CalendarView, type SearchParams } from "@/components/CalendarView";
-import { CommunityList } from "@/components/CommunityList";
+import { CommunitySearch } from "@/components/CommunitySearch";
 import { Subscribe } from "@/components/Subscribe";
 import { baseUrl } from "@/lib/base-url";
 import { listCommunities } from "@/lib/queries";
@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function Home({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const [params, communities, origin] = await Promise.all([searchParams, listCommunities(), baseUrl()]);
+  const searchable = communities.map((c) => ({ slug: c.slug, name: c.name, kind: c.kind, upcoming: c.upcoming }));
 
   if (!communities.length) {
     return (
@@ -18,6 +19,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
         <Link className="btn" href="/objavi">
           Kako objaviti
         </Link>
+        <div style={{ maxWidth: 520, margin: "24px auto 0", textAlign: "left" }}>
+          <CommunitySearch communities={searchable} />
+        </div>
       </div>
     );
   }
@@ -30,7 +34,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
           <p className="lead">Događaji i rokovi svih zajednica, redom kojim dolaze.</p>
         </div>
         <div className="only-mobile" style={{ marginBottom: 14 }}>
-          <CommunityList communities={communities} row />
+          <CommunitySearch communities={searchable} row />
         </div>
         <CalendarView
           basePath="/"
@@ -47,9 +51,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
       <aside className="split__aside">
         <div className="only-desktop" style={{ marginBottom: 16 }}>
           <h2 className="aside__title">Zajednice</h2>
-          <div className="paper">
-            <CommunityList communities={communities} />
-          </div>
+          <CommunitySearch communities={searchable} />
         </div>
         <div>
           <Subscribe baseUrl={origin} feedPath="/ics/sve.ics" name="Sve zajednice" label="Prati sve u svom kalendaru" block />

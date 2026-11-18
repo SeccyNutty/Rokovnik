@@ -8,6 +8,8 @@ export const ADMIN_PASSWORD = "e2e-lozinka";
 export const ORG = { domain: "fakultet.example", name: "Fakultet", slug: "fakultet" };
 export const LECTURE = "Gostujuce predavanje o robotici";
 export const WORKSHOP = "Radionica 3D ispisa";
+/** Tematska zajednica koju stvara 01-tok (skuplja objave s oznakom "Radionica"). */
+export const TOPIC = { name: "Radionice", slug: "radionice" };
 
 const pad = (n: number) => String(n).padStart(2, "0");
 

@@ -21,6 +21,11 @@ export default function PrivacyPage() {
         Adresa tvog osobnog kalendara (za kalendarsku aplikaciju) je tajna; možeš je zamijeniti novom u postavkama računa. Račun i sve njegove
         podatke možeš sam trajno obrisati na stranici „Moj račun”.
       </p>
+      <h2>Zahtjev da se organizacija pridruži</h2>
+      <p>
+        Kad zatražiš organizaciju koje još nema, spremamo njezin naziv, mrežnu stranicu i napomenu koje upišeš. Ako ostaviš e-mail adresu, koristimo je
+        samo da ti javimo kad se organizacija pridruži.
+      </p>
       <h2>Organizacije koje objavljuju</h2>
       <p>
         Od mailova poslanih na adresu za objave spremamo adresu i ime pošiljatelja, naslov i tekst poruke te rezultat provjere pošiljatelja

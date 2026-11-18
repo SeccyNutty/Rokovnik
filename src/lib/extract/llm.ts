@@ -1,5 +1,6 @@
 import { dateKey, timeKey, WEEKDAYS_LONG, weekdayOfKey } from "../time";
-import { CATEGORIES, parseExtractedItems, type ExtractionInput, type ExtractionResult } from "./types";
+import { TAGS, TAG_KEYS } from "../tags";
+import { parseExtractedItems, type ExtractionInput, type ExtractionResult } from "./types";
 
 /** Izvlačenje događaja i rokova iz maila pomoću Claude API-ja (strukturirani izlaz preko alata). */
 
@@ -20,6 +21,7 @@ Pravila:
 - Piši jezikom maila. Ukloni osobne brojeve telefona i potpise, osim službenog kontakta za događaj.
 - Proslijeđeni mail obradi prema izvornoj poruci, ne prema bilješci onoga tko prosljeđuje.
 - Otkazan događaj ne vraćaj.
+- tags: 1 do 3 oznake teme s popisa ispod (ključ lijevo). Biraj prema sadržaju, ne prema organizaciji. Rok prijave na događaj dobiva iste oznake kao događaj. Popis: ${TAGS.map((t) => `${t.key} (${t.label})`).join(", ")}.
 - confidence 0–1: koliko si siguran u datum i vrijeme.`;
 
 const TOOL = {
@@ -45,10 +47,10 @@ const TOOL = {
             online_url: { type: ["string", "null"] },
             registration_url: { type: ["string", "null"] },
             organizer: { type: ["string", "null"] },
-            category: { type: "string", enum: [...CATEGORIES] },
+            tags: { type: "array", items: { type: "string", enum: [...TAG_KEYS] }, maxItems: 3 },
             confidence: { type: "number" },
           },
-          required: ["kind", "title", "summary", "description", "start_date", "category", "confidence"],
+          required: ["kind", "title", "summary", "description", "start_date", "tags", "confidence"],
         },
       },
     },

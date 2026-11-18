@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { ADMIN_PASSWORD, future, LECTURE, loginAdmin, ORG, sendMail, WORKSHOP } from "./helpers";
+import { ADMIN_PASSWORD, future, LECTURE, loginAdmin, ORG, sendMail, TOPIC, WORKSHOP } from "./helpers";
 
 /**
  * Cijeli tok: mail nepoznate organizacije → zahtjev → potvrda jednim klikom → objava →
@@ -47,8 +47,8 @@ test("administracija traži lozinku i odbija krivu", async ({ page }) => {
 test("potvrda zajednice jednim klikom objavljuje mail na čekanju", async ({ page }) => {
   await loginAdmin(page);
   await expect(page.getByText(`Domena ${ORG.domain}`)).toBeVisible();
-  await page.getByLabel("Ime zajednice").fill(ORG.name);
-  await page.getByLabel("Adresa stranice").fill(ORG.slug);
+  await page.getByLabel("Ime zajednice", { exact: true }).fill(ORG.name);
+  await page.getByLabel("Adresa stranice", { exact: true }).fill(ORG.slug);
   await page.getByRole("button", { name: "Potvrdi zajednicu" }).click();
   await expect(page).toHaveURL(/poruka=potvrdeno/);
   await expect(page.locator(".flash--ok")).toContainText("Zajednica je potvrđena");
@@ -122,4 +122,23 @@ test("testni mail iz administracije prolazi istu obradu", async ({ page }) => {
   await page.getByLabel("Tekst maila").fill(`Smotra fakulteta odrzat ce se ${future(30).hr} u 10:00 u auli.`);
   await page.getByRole("button", { name: "Pošalji testni mail" }).click();
   await expect(page.locator(".flash--ok")).toContainText("obrađen i objavljen");
+});
+
+test("administrator stvara tematsku zajednicu i ispravlja oznake objave", async ({ page }) => {
+  await loginAdmin(page);
+  const form = page.locator("form", { has: page.locator("#topic-name") });
+  await form.getByLabel("Ime", { exact: true }).fill(TOPIC.name);
+  await form.getByLabel("Adresa stranice (neobavezno)").fill(TOPIC.slug);
+  await form.getByLabel("Radionica", { exact: true }).check();
+  await form.getByRole("button", { name: "Stvori temu" }).click();
+  await expect(page.locator(".flash--ok")).toContainText("Tematska zajednica je stvorena");
+
+  // Oznake predavanja: AI (ovdje pravila) je dodijelio "Predavanje"; dodajemo "Karijera i praksa".
+  const row = page.locator("table").last().locator("tr").filter({ has: page.getByRole("link", { name: LECTURE, exact: true }) });
+  await expect(row.locator("summary")).toContainText("Predavanje");
+  await row.locator("summary").click();
+  await row.getByLabel("Karijera i praksa").check();
+  await row.getByRole("button", { name: "Spremi oznake" }).click();
+  await expect(page.locator(".flash--ok")).toContainText("Spremljeno");
+  await expect(page.locator("table").last().locator("tr").filter({ has: page.getByRole("link", { name: LECTURE, exact: true }) }).locator("summary")).toContainText("Karijera i praksa");
 });

@@ -6,10 +6,12 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { requireAdmin } from "@/lib/auth";
 import { adminEmail, forwarderEmails, inboundAddress } from "@/lib/config";
 import { extractorMode, llmProvider, PROVIDER_LABEL } from "@/lib/extract";
-import { listCommunities, listHeldMessages, listManagers, listRecentItems, listRecentMessages, listRequests, listRules, relatedCommunities } from "@/lib/queries";
+import { listCommunities, listHeldMessages, listManagers, listOrganizationRequests, listRecentItems, listRecentMessages, listRequests, listRules, relatedCommunities } from "@/lib/queries";
 import { canSendEmail } from "@/lib/resend";
 import { dateKey, formatDateShort, timeKey } from "@/lib/time";
-import { toggleItemAction } from "@/app/community-actions";
+import { createTopicAction, setOrgRequestStatusAction, toggleItemAction } from "@/app/community-actions";
+import { ItemTagsEditor } from "@/components/ItemTagsEditor";
+import { TagCheckboxes } from "@/components/TagCheckboxes";
 import { CommunitySettings } from "@/components/CommunitySettings";
 import { logoutAction, reprocessAction, testMailAction } from "./actions";
 
@@ -41,6 +43,8 @@ const FLASH: Record<string, { text: string; ok: boolean }> = {
   "adresa-zauzeta": { text: "Ta adresa već pripada nekoj zajednici.", ok: false },
   "nema-ovlasti": { text: "Za tu radnju trebaš ovlasti administratora.", ok: false },
   "test-held": { text: "Testni mail čeka ručnu odluku u postavkama zajednice.", ok: true },
+  "tema-stvorena": { text: "Tematska zajednica je stvorena.", ok: true },
+  "tema-bez-oznaka": { text: "Tema treba ime i barem jednu oznaku.", ok: false },
   "test-nepotpun": { text: "Za testni mail trebaju adresa pošiljatelja i tekst.", ok: false },
   "test-published": { text: "Testni mail je obrađen i objavljen.", ok: true },
   "test-pending_community": { text: "Testni mail je od novog pošiljatelja: potvrdi zajednicu u zahtjevima.", ok: true },
@@ -52,7 +56,7 @@ const FLASH: Record<string, { text: string; ok: boolean }> = {
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ poruka?: string; n?: string }> }) {
   await requireAdmin();
   const sp = await searchParams;
-  const [requests, communities, rules, messages, items, held, managers] = await Promise.all([
+  const [requests, communities, rules, messages, items, held, managers, wanted] = await Promise.all([
     listRequests("pending"),
     listCommunities(),
     listRules(),
@@ -60,7 +64,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     listRecentItems(40),
     listHeldMessages(),
     listManagers(),
+    listOrganizationRequests(),
   ]);
+  const organizations = communities.filter((c) => c.kind !== "topic");
+  const topics = communities.filter((c) => c.kind === "topic");
   const related = await Promise.all(requests.map((r) => relatedCommunities(r)));
   const flash = sp.poruka ? FLASH[sp.poruka] : null;
   const year = Number(dateKey(new Date()).slice(0, 4));
@@ -101,7 +108,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       ) : (
         <div className="admin__grid">
           {requests.map((r, i) => (
-            <RequestForm key={r.id} request={r} communities={communities} related={related[i]} />
+            <RequestForm key={r.id} request={r} communities={organizations} related={related[i]} />
           ))}
         </div>
       )}
@@ -124,12 +131,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         <SubmitButton pending="Obrađujem mail…">Pošalji testni mail</SubmitButton>
       </form>
 
-      <h2 id="zajednice">Zajednice ({communities.length})</h2>
-      {communities.length === 0 ? (
+      <h2 id="zajednice">Zajednice organizacija ({organizations.length})</h2>
+      {organizations.length === 0 ? (
         <p className="muted">Još nema zajednica.</p>
       ) : (
         <div className="admin__grid">
-          {communities.map((c) => (
+          {organizations.map((c) => (
             <details key={c.id} className="paper paper--pad" open={held.some((h) => h.communityId === c.id)}>
               <summary style={{ cursor: "pointer" }}>
                 <b>{c.name}</b>{" "}
@@ -151,6 +158,106 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           ))}
         </div>
       )}
+
+      <h2 id="teme">Tematske zajednice ({topics.length})</h2>
+      <p className="note" style={{ marginTop: -6 }}>
+        Tema skuplja objave svih organizacija s odabranim oznakama, npr. „Stipendije” iz svih fakulteta i grada. Može se pratiti, pretplatiti i ugraditi kao i obična zajednica.
+      </p>
+      {topics.length ? (
+        <div className="admin__grid" style={{ marginBottom: 16 }}>
+          {topics.map((c) => (
+            <details key={c.id} className="paper paper--pad">
+              <summary style={{ cursor: "pointer" }}>
+                <b>{c.name}</b>{" "}
+                <span className="muted small">
+                  /z/{c.slug} · {c.upcoming} nadolazećih
+                </span>
+              </summary>
+              <div style={{ marginTop: 12 }}>
+                <CommunitySettings community={c} rules={[]} held={[]} managers={[]} admin from="admin" />
+              </div>
+            </details>
+          ))}
+        </div>
+      ) : null}
+      <details className="paper paper--pad" open={!topics.length}>
+        <summary style={{ cursor: "pointer" }}>
+          <b>Nova tematska zajednica</b>
+        </summary>
+        <form action={createTopicAction} style={{ marginTop: 12 }}>
+          <div className="field">
+            <label htmlFor="topic-name">Ime</label>
+            <input id="topic-name" name="name" required maxLength={80} placeholder="Stipendije i potpore" />
+          </div>
+          <div className="field">
+            <label htmlFor="topic-slug">Adresa stranice (neobavezno)</label>
+            <input id="topic-slug" name="slug" maxLength={60} placeholder="stipendije" />
+          </div>
+          <div className="field">
+            <label htmlFor="topic-desc">Kratak opis (neobavezno)</label>
+            <input id="topic-desc" name="description" maxLength={400} placeholder="Sve stipendije i potpore na jednom mjestu." />
+          </div>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <span style={{ fontWeight: 600, fontSize: 14.5 }}>Oznake koje tema skuplja</span>
+          </div>
+          <TagCheckboxes name="topicTags" selected={[]} idPrefix="new-topic" />
+          <SubmitButton pending="Stvaram…">Stvori temu</SubmitButton>
+        </form>
+      </details>
+
+      <h2 id="trazene">Tražene organizacije ({wanted.length})</h2>
+      <p className="note" style={{ marginTop: -6 }}>Posjetitelji su tražili organizaciju koje nema. Kad je dovedeš (organizacija pošalje prvi mail), označi zahtjev riješenim.</p>
+      <div className="paper tablewrap">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Organizacija</th>
+              <th>Zahtjeva</th>
+              <th>Zadnji</th>
+              <th>Za obavijest</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {wanted.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="muted">
+                  Nema otvorenih zahtjeva.
+                </td>
+              </tr>
+            ) : null}
+            {wanted.map((w) => (
+              <tr key={w.id}>
+                <td>
+                  <b>{w.name}</b>
+                  {w.website ? (
+                    <div className="small">
+                      <a href={w.website} target="_blank" rel="noopener noreferrer nofollow">
+                        {w.website}
+                      </a>
+                    </div>
+                  ) : null}
+                  {w.note ? <div className="small muted">{w.note}</div> : null}
+                </td>
+                <td>{w.requestCount}</td>
+                <td style={{ whiteSpace: "nowrap" }}>{formatDateShort(dateKey(w.lastRequestedAt), year)}</td>
+                <td className="small">{w.contactEmails.length ? w.contactEmails.join(", ") : "—"}</td>
+                <td>
+                  <form action={setOrgRequestStatusAction} className="linkrow" style={{ flexWrap: "nowrap" }}>
+                    <input type="hidden" name="requestId" value={w.id} />
+                    <SubmitButton className="btn btn--quiet btn--small" name="status" value="done" pending="…">
+                      Riješeno
+                    </SubmitButton>
+                    <SubmitButton className="btn btn--quiet btn--small" name="status" value="dismissed" pending="…">
+                      Odbaci
+                    </SubmitButton>
+                  </form>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <h2 id="poruke">Zadnji mailovi</h2>
       <div className="paper tablewrap">
@@ -213,13 +320,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               <th>Termin</th>
               <th>Objava</th>
               <th>Zajednica</th>
+              <th>Oznake</th>
               <th />
             </tr>
           </thead>
           <tbody>
             {items.length === 0 ? (
               <tr>
-                <td colSpan={4} className="muted">
+                <td colSpan={5} className="muted">
                   Još nema objava.
                 </td>
               </tr>
@@ -235,6 +343,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   {i.status === "hidden" ? <span className="tag" style={{ marginLeft: 6 }}>skriveno</span> : null}
                 </td>
                 <td>{i.communityName}</td>
+                <td>
+                  <ItemTagsEditor itemId={i.id} tags={i.tags} from="admin" />
+                </td>
                 <td>
                   <form action={toggleItemAction} className="inline">
                     <input type="hidden" name="povratak" value="admin" />

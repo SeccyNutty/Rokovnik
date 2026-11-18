@@ -57,6 +57,15 @@ Oznake u tablicama:
 | Javni JSON API (`/api/v1/…`) | Lokalno | samo čitanje, CORS otvoren |
 | Obični iframe (`/ugradi/<zajednica>`) | Lokalno | |
 
+### Teme i pretraga
+
+| Funkcija | Stanje | Napomena |
+|---|---|---|
+| Oznake na objavama (19 tema), AI ih dodjeljuje, ispravak u administraciji | Lokalno | postojeće objave dobile su oznaku iz stare kategorije |
+| Filtar „Tema” u kalendaru, oznake u opisu događaja | Lokalno | |
+| Tematske zajednice (npr. „Stipendije” iz svih organizacija) | Lokalno | stvara ih administrator; nijedna još nije stvorena |
+| Pretraga zajednica i zahtjev „Zatraži da se pridruži” | Lokalno | mail administratoru za 1., 3., 10., 25. … zahtjev |
+
 ### Računi
 
 | Funkcija | Stanje | Napomena |
@@ -78,7 +87,7 @@ Oznake u tablicama:
 | Predmemorija javnih upita s poništavanjem pri objavi | Lokalno | drugo otvaranje stranice: 0 upita prema bazi |
 | Traka napretka pri navigaciji, gumbi s trenutnom reakcijom | Lokalno | |
 | Keepalive (GitHub Actions) | Lokalno | treba varijablu `SITE_URL` u GitHubu |
-| Testovi: 66 testova logike, 52 testa u pregledniku, smoke provjera | Lokalno | `pnpm test`, `pnpm test:e2e`, `pnpm smoke <adresa>` |
+| Testovi: 75 testova logike, 63 testa u pregledniku, smoke provjera | Lokalno | `pnpm test`, `pnpm test:e2e`, `pnpm smoke <adresa>` |
 | Test točnosti čitanja: 27 mailova, 36 stavki | Lokalno | `pnpm tocnost`; osnovna razina bez AI-ja 53 % stavki, AI još nije izmjeren |
 | CI na GitHubu (lint, tipovi, testovi, build, e2e) | Lokalno | |
 
@@ -102,27 +111,29 @@ Napravljeno: predmemorija upita s trenutnim poništavanjem (1., 3.), usporedni u
 1. **Google prijava** (DEPLOY.md, korak 7) i `APP_URL` na Netlifyju.
 2. **Test točnosti**: `pnpm tocnost` (izravno), zatim `pnpm tocnost posalji` i `provjeri` na objavljenoj stranici. Ako je točnost slaba na nekoj vrsti mailova, popravljamo upute AI-ju i ponavljamo.
 3. **Regija funkcija i keepalive** (DEPLOY.md, „Brzina”).
-4. **Provjeri DMARC domene `fsb.unizg.hr`.** Ako ga nema, okružnice poslane izravno s FSB-a čekat će ručnu odluku; tada za tu zajednicu uključi blažu provjeru ili ih prosljeđuj sa svoje adrese.
+4. **Stvori prve tematske zajednice** u `/admin` → *Tematske zajednice* (npr. Stipendije, Natječaji i EU fondovi, Cjeloživotno obrazovanje).
+5. **Provjeri DMARC domene `fsb.unizg.hr`.** Ako ga nema, okružnice poslane izravno s FSB-a čekat će ručnu odluku; tada za tu zajednicu uključi blažu provjeru ili ih prosljeđuj sa svoje adrese.
 
 ### Prije razgovora s FSB-om
 
-5. **Proći cijeli tok na produkciji**: prijava, Moj kalendar, praćenje, račun organizacije, widget na probnoj stranici, pretplata u Google i Apple kalendaru.
-6. **Dopuštenje FSB-a** za javnu objavu okružnica (dio je interan).
+6. **Proći cijeli tok na produkciji**: prijava, Moj kalendar, praćenje, račun organizacije, widget na probnoj stranici, pretplata u Google i Apple kalendaru.
+7. **Dopuštenje FSB-a** za javnu objavu okružnica (dio je interan).
 
 ### Prije javnog lansiranja
 
-7. **Vlastita domena** (`rokovnik.hr` ili slična): web adresa, adresa za objave i slanje povratnih poruka organizacijama.
-8. **Uređivanje objave** u administraciji i na stranici organizacije (danas: sakrij ili pošalji ispravak mailom).
-9. **Sigurnosne kopije baze** (besplatni Supabase ih nema) i praćenje grešaka.
-10. **Privatnost i uvjeti**: pravni pregled teksta, obrada osobnih podataka iz mailova, brisanje na zahtjev.
+8. **Vlastita domena** (`rokovnik.hr` ili slična): web adresa, adresa za objave i slanje povratnih poruka organizacijama.
+9. **Uređivanje objave** u administraciji i na stranici organizacije (danas: sakrij ili pošalji ispravak mailom).
+10. **Sigurnosne kopije baze** (besplatni Supabase ih nema) i praćenje grešaka.
+11. **Privatnost i uvjeti**: pravni pregled teksta, obrada osobnih podataka iz mailova, brisanje na zahtjev.
 
 ### Kasnije
 
-11. Podsjetnici pred rok i tjedni sažetak mailom (sada je moguće jer postoje računi).
-12. Sučelje na engleskom.
-13. Objava događaja kroz obrazac na stranici organizacije (uz mail).
-14. Predmemorija stranica na CDN-u kad promet naraste.
-15. Model prihoda (sponzori; besplatno za organizacije koje ne zarađuju).
+12. Podsjetnici pred rok i tjedni sažetak mailom (sada je moguće jer postoje računi).
+13. Sučelje na engleskom.
+14. Objava događaja kroz obrazac na stranici organizacije (uz mail).
+15. Predmemorija stranica na CDN-u kad promet naraste.
+16. Model prihoda (sponzori; besplatno za organizacije koje ne zarađuju).
+17. Obavijest mailom onima koji su tražili organizaciju, kad se ona pridruži (adrese se već spremaju).
 
 ## Poznata ograničenja
 

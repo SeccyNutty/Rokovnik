@@ -598,3 +598,32 @@ details.more summary { cursor: pointer; font-weight: 600; color: var(--ink-2); p
 .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12.5px; font-weight: 650; background: var(--pen-soft); color: var(--pen-dark); }
 .warn { margin-top: 10px; padding: 10px 12px; background: #fff8d6; border-radius: 8px; font-size: 14.5px; }
 .btn--small, .table .btn { white-space: nowrap; }
+
+/* ── Teme (oznake) ───────────────────────────────────────────────────────── */
+.controls > .chips--tags { flex-basis: 100%; }
+.chip--tag { font-weight: 600; }
+.chip__n { font-size: 12px; font-weight: 700; color: var(--ink-3); margin-left: 2px; }
+.chip[aria-current="true"] .chip__n { color: #c9d0e3; }
+.tags { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-pill { display: inline-block; padding: 4px 10px; border-radius: 999px; background: var(--pen-soft); color: var(--pen-dark); font-size: 13.5px; font-weight: 650; text-decoration: none; }
+.tag-pill:hover { background: #d9e0fb; color: var(--pen-dark); }
+.badge--topic { background: var(--marker); color: var(--ink); }
+
+/* ── Pretraga zajednica ──────────────────────────────────────────────────── */
+.search { position: relative; }
+.search input { width: 100%; box-sizing: border-box; min-height: 46px; padding: 10px 14px 10px 40px; border: 1px solid var(--rule); border-radius: var(--radius); font: inherit; font-size: 16px; background: var(--paper); color: var(--ink); }
+.search input:focus { outline: 2px solid var(--pen); outline-offset: 1px; border-color: var(--pen); }
+.search__icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--ink-3); pointer-events: none; }
+.search__none { padding: 14px 16px; font-size: 15px; color: var(--ink-2); }
+.orgreq { margin-top: 10px; padding: 16px; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--paper); }
+.orgreq h3 { margin: 0 0 6px; font-size: 17px; }
+.orgreq .field { margin-bottom: 10px; }
+.hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.clist__kind { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 700; background: var(--marker); color: var(--ink); vertical-align: 1px; }
+.linkbtn { background: none; border: 0; padding: 0; font: inherit; color: var(--pen); text-decoration: underline; cursor: pointer; }
+.linkbtn:hover { color: var(--pen-dark); }
+.tagpick { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px 12px; margin: 8px 0 12px; }
+.tagpick__item { display: flex; align-items: center; gap: 8px; font-size: 14.5px; min-height: 32px; cursor: pointer; }
+.tagpick__item input { width: 18px; height: 18px; flex: none; }
+.tagedit summary { cursor: pointer; font-size: 13.5px; color: var(--ink-2); }
+.tagedit[open] { min-width: 260px; }

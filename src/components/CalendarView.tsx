@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { baseUrl } from "@/lib/base-url";
-import { listItems, listUpcoming, toView } from "@/lib/queries";
+import { listItems, listTagCounts, listUpcoming, toView } from "@/lib/queries";
+import { isTag, tagLabel } from "@/lib/tags";
 import { addDays, dateKey, formatDateLong, isValidDateKey, MONTHS_NOMINATIVE, WEEKDAYS_SHORT, weekdayOfKey, zonedToUtc } from "@/lib/time";
 import { Agenda } from "./Agenda";
 import { IconNext, IconPrev } from "./icons";
@@ -30,6 +31,8 @@ export async function CalendarView(props: {
   basePath: string;
   params: SearchParams;
   communityIds?: string[];
+  /** Oznake tematskih zajednica: stavke s barem jednom od njih. */
+  anyTags?: string[];
   /** Pojedinačno spremljene stavke, uz stavke odabranih zajednica. */
   itemIds?: string[];
   showCommunity: boolean;
@@ -45,9 +48,15 @@ export async function CalendarView(props: {
   const vrsta = one(params.vrsta);
   const kind = vrsta === "rokovi" ? "deadline" : vrsta === "dogadaji" ? "event" : undefined;
   const month = one(params.prikaz) === "mjesec";
+  const temaParam = one(params.tema);
+  const tag = isTag(temaParam) ? temaParam : undefined;
   const now = new Date();
   const todayKey = dateKey(now);
-  const origin = await baseUrl();
+  const scope = { communityIds: props.communityIds, anyTags: props.anyTags, itemIds: props.itemIds };
+  const [origin, tagCounts] = await Promise.all([baseUrl(), props.hideControls ? Promise.resolve([]) : listTagCounts({ ...scope, kind }, now)]);
+  // Odabrana tema ostaje u izborniku i kad trenutno nema objava.
+  const shownTags = tagCounts.slice(0, 14);
+  if (tag && !shownTags.some((t) => t.key === tag)) shownTags.push({ key: tag, n: 0 });
 
   const controls = props.hideControls ? null : (
     <div className="controls">
@@ -77,11 +86,26 @@ export async function CalendarView(props: {
           <LinkHint />
         </Link>
       </div>
+      {shownTags.length > 1 || tag ? (
+        <div className="chips chips--tags" role="group" aria-label="Tema">
+          <Link className="chip chip--tag" href={hrefWith(basePath, params, { tema: null, dan: null })} aria-current={!tag ? "true" : undefined}>
+            Sve teme
+            <LinkHint />
+          </Link>
+          {shownTags.map((t) => (
+            <Link key={t.key} className="chip chip--tag" href={hrefWith(basePath, params, { tema: t.key, dan: null })} aria-current={tag === t.key ? "true" : undefined}>
+              {tagLabel(t.key)}
+              {t.n ? <span className="chip__n">{t.n}</span> : null}
+              <LinkHint />
+            </Link>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 
   if (!month) {
-    const rows = await listUpcoming({ communityIds: props.communityIds, itemIds: props.itemIds, kind, limit: props.limit ?? 150 }, now);
+    const rows = await listUpcoming({ ...scope, kind, tag, limit: props.limit ?? 150 }, now);
     return (
       <>
         {controls}
@@ -103,7 +127,7 @@ export async function CalendarView(props: {
   const cells: string[] = [];
   for (let k = gridStart; k <= gridEnd; k = addDays(k, 1)) cells.push(k);
 
-  const rows = await listItems({ communityIds: props.communityIds, itemIds: props.itemIds, kind, from: zonedToUtc(gridStart), to: zonedToUtc(addDays(gridEnd, 1)), limit: 400 });
+  const rows = await listItems({ ...scope, kind, tag, from: zonedToUtc(gridStart), to: zonedToUtc(addDays(gridEnd, 1)), limit: 400 });
   const byDay = new Map<string, typeof rows>();
   for (const r of rows) {
     const start = dateKey(r.startsAt);
