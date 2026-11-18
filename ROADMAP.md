@@ -128,7 +128,7 @@ Napravljeno: predmemorija upita s trenutnim poništavanjem (1., 3.), usporedni u
 
 ### Kasnije
 
-12. Podsjetnici pred rok i tjedni sažetak mailom (sada je moguće jer postoje računi).
+12. Podsjetnici pred rok mailom (sada je moguće jer postoje računi). Tjedni sažeci mailom nisu u planu.
 13. Sučelje na engleskom.
 14. Objava događaja kroz obrazac na stranici organizacije (uz mail).
 15. Predmemorija stranica na CDN-u kad promet naraste.
